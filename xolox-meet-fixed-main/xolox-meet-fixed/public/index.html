@@ -180,6 +180,34 @@
       font-family: 'Google Sans', sans-serif;
     }
 
+    #ice-debug-panel {
+      margin-left: auto;
+      max-width: min(48vw, 520px);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      color: #c7d3c7;
+      background: rgba(12, 20, 12, 0.92);
+      border: 1px solid rgba(34,197,94,0.35);
+      border-radius: 8px;
+      padding: 6px 8px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    #ice-debug-panel .ice-title {
+      color: #9bc79b;
+      font-weight: 600;
+      margin-bottom: 2px;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    #ice-debug-panel .ice-line {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* Video grid */
     #video-grid {
       flex: 1; display: grid; gap: 8px; padding: 8px;
@@ -871,6 +899,10 @@
   <div class="meeting-bar">
     <div style="display:flex;align-items:center;gap:10px">
       <div class="logo">Xolox <span>Meet</span></div>
+    </div>
+    <div id="ice-debug-panel" aria-live="polite">
+      <div class="ice-title">ICE Debug</div>
+      <div class="ice-line">Waiting for peers…</div>
     </div>
   </div>
 
@@ -1784,6 +1816,87 @@ function toggleRecording() {
 const peers = {};           // peerId -> { name }
 const peerConnections = {}; // peerId -> RTCPeerConnection
 const pendingCandidates = {}; // peerId -> [candidate] -- buffered until remote desc set
+const peerDiagnostics = {}; // peerId -> { name, conn, iceConn, iceGathering, localCandType, remoteCandType, selectedPairType }
+
+function parseCandidateType(candidateValue) {
+  const c = typeof candidateValue === 'string' ? candidateValue : candidateValue?.candidate;
+  if (!c) return 'unknown';
+  const m = c.match(/\btyp\s+([a-zA-Z0-9]+)/);
+  return m?.[1] || 'unknown';
+}
+
+function updatePeerDiagnostics(peerId, patch) {
+  if (!peerDiagnostics[peerId]) {
+    peerDiagnostics[peerId] = {
+      name: peers[peerId]?.name || 'Guest',
+      conn: 'new',
+      iceConn: 'new',
+      iceGathering: 'new',
+      localCandType: '-',
+      remoteCandType: '-',
+      selectedPairType: '-'
+    };
+  }
+  Object.assign(peerDiagnostics[peerId], patch);
+  renderIceDiagnostics();
+}
+
+function removePeerDiagnostics(peerId) {
+  delete peerDiagnostics[peerId];
+  renderIceDiagnostics();
+}
+
+function renderIceDiagnostics() {
+  const panel = document.getElementById('ice-debug-panel');
+  if (!panel) return;
+  const ids = Object.keys(peerDiagnostics);
+  let html = '<div class="ice-title">ICE Debug</div>';
+  if (ids.length === 0) {
+    html += '<div class="ice-line">Waiting for peers…</div>';
+    panel.innerHTML = html;
+    return;
+  }
+  html += ids.map((peerId) => {
+    const d = peerDiagnostics[peerId];
+    const shortId = peerId.slice(0, 6);
+    return `<div class="ice-line">${(d.name || 'Guest').slice(0, 12)}(${shortId}) conn:${d.conn} ice:${d.iceConn} gather:${d.iceGathering} local:${d.localCandType} remote:${d.remoteCandType} pair:${d.selectedPairType}</div>`;
+  }).join('');
+  panel.innerHTML = html;
+}
+
+async function updateSelectedPairType(pc, peerId) {
+  try {
+    const stats = await pc.getStats();
+    let localType = '-';
+    let remoteType = '-';
+    let selectedType = '-';
+    let selectedPair = null;
+    let selectedPairFromTransport = null;
+
+    stats.forEach((report) => {
+      if (report.type === 'transport' && report.selectedCandidatePairId) {
+        selectedPairFromTransport = report.selectedCandidatePairId;
+      }
+    });
+
+    stats.forEach((report) => {
+      if (report.type === 'candidate-pair') {
+        const isSelected = report.id === selectedPairFromTransport || report.selected === true || (report.nominated && report.state === 'succeeded');
+        if (isSelected && !selectedPair) selectedPair = report;
+      }
+    });
+
+    if (selectedPair) {
+      const local = stats.get(selectedPair.localCandidateId);
+      const remote = stats.get(selectedPair.remoteCandidateId);
+      localType = local?.candidateType || '-';
+      remoteType = remote?.candidateType || '-';
+      selectedType = localType === 'relay' || remoteType === 'relay' ? 'relay' : (localType !== '-' ? localType : remoteType);
+    }
+
+    updatePeerDiagnostics(peerId, { selectedPairType: selectedType, localCandType: localType, remoteCandType: remoteType });
+  } catch (_) {}
+}
 
 // Create an RTCPeerConnection for a peer.
 // isInitiator: true if we should send the offer. The peer who joined LATER initiates.
@@ -1792,6 +1905,7 @@ function createPeerConnection(peerId, isInitiator) {
 
   const pc = new RTCPeerConnection(ICE_SERVERS);
   peerConnections[peerId] = pc;
+  updatePeerDiagnostics(peerId, { name: peers[peerId]?.name || 'Guest', conn: pc.connectionState, iceConn: pc.iceConnectionState, iceGathering: pc.iceGatheringState });
 
   // Add all local tracks (audio + video). These get sent to the peer.
   if (localStream) {
@@ -1824,7 +1938,19 @@ function createPeerConnection(peerId, isInitiator) {
   // Forward ICE candidates to the peer via socket
   pc.onicecandidate = (event) => {
     if (event.candidate) {
+      updatePeerDiagnostics(peerId, { localCandType: parseCandidateType(event.candidate) });
       socket.emit('ice-candidate', { to: peerId, candidate: event.candidate });
+    }
+  };
+
+  pc.onicegatheringstatechange = () => {
+    updatePeerDiagnostics(peerId, { iceGathering: pc.iceGatheringState });
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    updatePeerDiagnostics(peerId, { iceConn: pc.iceConnectionState });
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      updateSelectedPairType(pc, peerId);
     }
   };
 
@@ -1836,11 +1962,13 @@ function createPeerConnection(peerId, isInitiator) {
     const tile = document.getElementById(`tile-${peerId}`);
     if (!tile) return;
     const state = pc.connectionState;
+    updatePeerDiagnostics(peerId, { conn: state });
     tile.classList.remove('tile-connecting', 'tile-failed');
     if (state === 'connecting' || state === 'new') {
       tile.classList.add('tile-connecting');
     } else if (state === 'connected') {
       clearTimeout(iceRestartTimer);
+      updateSelectedPairType(pc, peerId);
     } else if (state === 'failed') {
       tile.classList.add('tile-failed');
       // Try ICE restart automatically after 2s on either side.
@@ -1897,6 +2025,7 @@ function closePeerConnection(peerId) {
     delete peerConnections[peerId];
   }
   delete pendingCandidates[peerId];
+  removePeerDiagnostics(peerId);
 }
 
 // ════════════════════════════════════════
@@ -1907,6 +2036,7 @@ function setupSocketEvents() {
     // We joined later, so WE initiate the connection to each existing peer
     peerList.forEach(({ peerId, userName }) => {
       peers[peerId] = { name: userName };
+      updatePeerDiagnostics(peerId, { name: userName });
       addVideoTile(peerId, null, userName, false);
       document.getElementById(`tile-${peerId}`)?.classList.add('tile-connecting');
       createPeerConnection(peerId, true);
@@ -1917,6 +2047,7 @@ function setupSocketEvents() {
     addChatMsg(null, `${userName} joined`, true);
     if (!peers[peerId]) {
       peers[peerId] = { name: userName };
+      updatePeerDiagnostics(peerId, { name: userName });
       addVideoTile(peerId, null, userName, false);
     }
     document.getElementById(`tile-${peerId}`)?.classList.add('tile-connecting');
@@ -1964,6 +2095,7 @@ function setupSocketEvents() {
   });
 
   socket.on('ice-candidate', async ({ from, candidate }) => {
+    updatePeerDiagnostics(from, { remoteCandType: parseCandidateType(candidate) });
     const pc = peerConnections[from];
     if (!pc || !pc.remoteDescription) {
       // Buffer until remote description is set
@@ -2179,6 +2311,8 @@ function leaveMeeting() {
   // Close all WebRTC peer connections
   Object.keys(peerConnections).forEach(id => closePeerConnection(id));
   Object.keys(peers).forEach(id => delete peers[id]);
+  Object.keys(peerDiagnostics).forEach(id => delete peerDiagnostics[id]);
+  renderIceDiagnostics();
   if (activePresentationFrom === socket?.id && activePresentationMode) {
     socket?.emit('presentation-stop', { roomId: myRoom });
   }
