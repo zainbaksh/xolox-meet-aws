@@ -332,3 +332,5 @@ For issues, feature requests, or contributions, please refer to the project repo
 --permission- now
 --file upload- later
 --file sharing
+
+**IMPORTANT** added ice debuging from lines 182 to 208 in index.html will remove once backend is stable
