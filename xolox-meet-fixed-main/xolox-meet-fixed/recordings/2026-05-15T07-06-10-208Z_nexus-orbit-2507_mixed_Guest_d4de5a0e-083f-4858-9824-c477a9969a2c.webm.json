@@ -1,0 +1,12 @@
+{
+  "sessionId": "d4de5a0e-083f-4858-9824-c477a9969a2c",
+  "roomId": "nexus-orbit-2507",
+  "recorderSocketId": "rsTfWCoNUF8CXHisAAAD",
+  "fileName": "2026-05-15T07-06-10-208Z_nexus-orbit-2507_mixed_Guest_d4de5a0e-083f-4858-9824-c477a9969a2c.webm",
+  "createdAt": "2026-05-15T07:06:10.211Z",
+  "transcriptStatus": "failed",
+  "updatedAt": "2026-05-15T07:06:13.062Z",
+  "stoppedAt": "2026-05-15T07:06:12.933Z",
+  "bytes": 0,
+  "transcriptError": "ffmpeg unavailable: C:\\Users\\shaik\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe exited 3199971767: ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r\n  built with gcc 15.2.0 (Rev13, Built by MSYS2 project)\r\n  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-cairo --enable-fontconfig --enable-iconv --enable-gnutls --enable-lcms2 --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --ena"
+}

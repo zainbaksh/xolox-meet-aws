@@ -1,0 +1,12 @@
+{
+  "sessionId": "e332820a-495e-4374-bec9-d10196709b78",
+  "roomId": "mixroom",
+  "recorderSocketId": "socket-1",
+  "fileName": "2026-05-14T07-45-01-529Z_mixroom_mixed_owner_e332820a-495e-4374-bec9-d10196709b78.webm",
+  "createdAt": "2026-05-14T07:45:01.530Z",
+  "transcriptStatus": "failed",
+  "updatedAt": "2026-05-14T07:45:01.717Z",
+  "stoppedAt": "2026-05-14T07:45:01.692Z",
+  "bytes": 6,
+  "transcriptError": "ffmpeg unavailable: spawn ffmpeg ENOENT"
+}

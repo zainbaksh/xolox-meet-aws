@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Xolox Meet</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300c853'/%3E%3Cpath d='M8 11h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zm14 3 5-3v10l-5-3v-4z' fill='%23fff'/%3E%3C/svg%3E"/>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Google Fonts: Google Sans + Material Symbols Rounded -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&family=Google+Sans+Display:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet"/>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000;
+      --surface: #0a120a;
+      --surface2: #111a11;
+      --border: #1a2e1a;
+      --accent: #22c55e;
+      --accent2: #16a34a;
+      --text: #fff;
+      --muted: #6b7a6b;
+      --red: #ef4444;
+      --radius: 14px;
+
+      /* Google Meet bottom bar tokens */
+      --meet-bar-bg: #202124;
+      --meet-btn-bg: #3c4043;
+      --meet-btn-hover: #4a4d51;
+      --meet-btn-off: #ea4335;
+      --meet-btn-off-hover: #d93025;
+      --meet-end-bg: #ea4335;
+      --meet-end-hover: #d93025;
+      --meet-icon: #e8eaed;
+      --meet-bar-height: 80px;
+    }
+
+    body {
+      font-family: 'Google Sans', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .material-symbols-rounded {
+      font-family: 'Material Symbols Rounded';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* ── MESH ── */
+    .mesh {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 60% at 15% 10%, rgba(34,197,94,0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 50% at 85% 85%, rgba(22,163,74,0.07) 0%, transparent 65%);
+    }
+
+    /* ══════════════════════════════
+       HOME PAGE
+    ══════════════════════════════ */
+    #page-home {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 44px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.3px; font-family: 'Google Sans Display', 'Google Sans', sans-serif; }
+    .logo span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    .hero {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 60px 24px;
+    }
+
+    .hero-inner { max-width: 520px; width: 100%; text-align: center; }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem); font-weight: 600;
+      line-height: 1.15; letter-spacing: -1px; margin-bottom: 40px;
+      font-family: 'Google Sans Display', 'Google Sans', sans-serif;
+    }
+
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px; text-align: left;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover { border-color: rgba(34,197,94,0.4); transform: translateY(-2px); }
+    .card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 14px; }
+
+    input[type="text"] {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 9px; padding: 10px 14px; color: var(--text);
+      font-family: inherit; font-size: 0.9rem; outline: none;
+      transition: border-color 0.2s; margin-bottom: 8px; display: block;
+    }
+
+    input[type="text"]:focus { border-color: rgba(34,197,94,0.5); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 10px 16px; border-radius: 9px;
+      font-family: inherit; font-size: 0.88rem; font-weight: 500;
+      cursor: pointer; border: none; transition: all 0.2s; margin-top: 4px;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #000; }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: rgba(34,197,94,0.4); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero-inner > * { animation: fadeUp 0.5s ease both; }
+    .hero-inner > *:nth-child(1) { animation-delay: 0.05s; }
+    .hero-inner > *:nth-child(2) { animation-delay: 0.12s; }
+
+    /* ══════════════════════════════
+       MEETING PAGE
+    ══════════════════════════════ */
+    #page-meeting {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      flex-direction: column; background: #000;
+    }
+
+    #page-meeting.active { display: flex; }
+
+    /* ── Top info bar (slim, no controls) ── */
+    .meeting-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; background: rgba(0,0,0,0.95);
+      border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+      height: 52px;
+    }
+
+    .meeting-bar .logo { font-size: 1rem; }
+
+    .room-pill {
+      font-size: 0.78rem; color: var(--muted); background: var(--surface);
+      padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border);
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    /* Video grid */
+    #video-grid {
+      flex: 1; display: grid; gap: 8px; padding: 8px;
+      align-content: center; justify-content: center;
+      overflow: hidden;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      /* leave space for bottom bar */
+      padding-bottom: calc(var(--meet-bar-height) + 8px);
+    }
+
+    .video-tile {
+      position: relative; background: var(--surface);
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 16/9;
+    }
+
+    .video-tile video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+
+    .video-tile .name-tag {
+      position: absolute; bottom: 10px; left: 10px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      font-size: 0.78rem; padding: 3px 10px; border-radius: 99px;
+      font-weight: 500; font-family: 'Google Sans', sans-serif;
+    }
+
+    .video-tile .muted-icon {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(239,68,68,0.8); border-radius: 50%;
+      width: 26px; height: 26px;
+      display: none; align-items: center; justify-content: center;
+    }
+    .video-tile .muted-icon .material-symbols-rounded { font-size: 14px; color: #fff; }
+
+    .video-tile.mic-off .muted-icon { display: flex; }
+
+    .video-tile .avatar {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      background: var(--surface2); font-size: 2.5rem;
+      font-weight: 600; color: var(--accent);
+      font-family: 'Google Sans Display', 'Google Sans', sans-serif;
+    }
+
+    .video-tile.cam-off .avatar { display: flex; }
+    .video-tile.cam-off video { opacity: 0; }
+
+    /* WebRTC connection states */
+    .video-tile .conn-state {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; gap: 8px;
+      background: rgba(0,0,0,0.6);
+      color: rgba(255,255,255,0.9);
+      font-size: 0.88rem; font-weight: 500;
+      font-family: 'Google Sans', sans-serif;
+      z-index: 2;
+    }
+    .video-tile.tile-connecting .conn-state,
+    .video-tile.tile-failed .conn-state { display: flex; }
+    .video-tile.tile-connecting .conn-state::before {
+      content: '';
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .video-tile.tile-connecting .conn-state::after { content: 'Connecting…'; }
+    .video-tile.tile-failed .conn-state::after { content: 'Connection lost — retrying…'; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Chat panel */
+    #chat-panel {
+      position: absolute; right: 0; top: 52px; bottom: var(--meet-bar-height);
+      width: 300px; background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: none; flex-direction: column; z-index: 10;
+    }
+
+    #chat-panel.open { display: flex; }
+
+    #meeting-content {
+      position: relative;
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #whiteboard-panel {
+      position: absolute;
+      inset: 8px;
+      background: #0d140d;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      display: none; flex-direction: column; z-index: 12;
+      overflow: hidden;
+    }
+
+    #whiteboard-panel.open { display: flex; }
+
+    #whiteboard-panel.fullscreen {
+      inset: 0;
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+      border-top: 0;
+    }
+
+    .wb-header {
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.86rem; font-weight: 600;
+      font-family: 'Google Sans', sans-serif;
+      background: #111b11;
+    }
+
+    .wb-btn {
+      border: 1px solid var(--border); background: var(--surface2); color: #fff;
+      border-radius: 7px; padding: 6px 10px; cursor: pointer; font-size: 0.76rem;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    .wb-btn:hover { border-color: rgba(34,197,94,0.5); }
+
+    #screen-stage {
+      position: absolute;
+      inset: 8px;
+      background: #0d140d;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      display: none;
+      overflow: hidden;
+      z-index: 11;
+    }
+
+    #screen-stage video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #0a0a0a;
+    }
+
+    #page-meeting.presentation-active #video-grid {
+      flex: 0 0 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+      padding-bottom: calc(var(--meet-bar-height) + 8px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      align-content: flex-start;
+      justify-content: flex-start;
+      grid-template-columns: none;
+    }
+
+    #page-meeting.presentation-active #video-grid .video-tile {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      flex: 0 0 auto;
+    }
+
+    #page-meeting.presentation-active #whiteboard-panel.open {
+      position: relative;
+      inset: auto;
+      display: flex;
+      flex: 1;
+      border-radius: 12px;
+      box-shadow: none;
+      z-index: 12;
+    }
+
+    #page-meeting.presentation-active #screen-stage.open {
+      position: relative;
+      inset: auto;
+      display: block;
+      flex: 1;
+      border-radius: 12px;
+      box-shadow: none;
+      z-index: 12;
+    }
+
+    .wb-frame-wrap {
+      flex: 1;
+      min-height: 0;
+      background: #0b0b0b;
+    }
+
+    #whiteboard-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #111;
+    }
+
+    .chat-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-size: 0.88rem; font-weight: 600;
+      display: flex; align-items: center; justify-content: space-between;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    .chat-close {
+      cursor: pointer; color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .chat-close:hover { color: var(--text); }
+    .chat-close .material-symbols-rounded { font-size: 18px; }
+
+    #chat-messages {
+      flex: 1; overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .chat-msg { font-size: 0.83rem; line-height: 1.5; font-family: 'Google Sans', sans-serif; }
+    .chat-msg .sender { font-weight: 600; color: var(--accent); margin-bottom: 2px; font-size: 0.78rem; }
+    .chat-msg .text { color: rgba(255,255,255,0.85); }
+    .chat-msg.system { text-align: center; color: var(--muted); font-size: 0.78rem; font-style: italic; }
+
+    .chat-input-row {
+      display: flex; gap: 6px; padding: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input-row input {
+      flex: 1; margin-bottom: 0; font-size: 0.85rem; padding: 8px 12px;
+    }
+
+    .chat-send {
+      width: 34px; height: 34px; border-radius: 8px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .chat-send .material-symbols-rounded { font-size: 18px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(var(--meet-bar-height) + 16px); left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: #3c4043; border: 1px solid rgba(255,255,255,0.12);
+      color: #e8eaed; padding: 10px 18px; border-radius: 9px;
+      font-size: 0.85rem; z-index: 9999;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      white-space: nowrap; font-family: 'Google Sans', sans-serif;
+      opacity: 0; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* Participant count badge */
+    .peer-count {
+      font-size: 0.75rem; background: rgba(34,197,94,0.15);
+      color: var(--accent); border: 1px solid rgba(34,197,94,0.3);
+      padding: 2px 8px; border-radius: 99px;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       GOOGLE MEET-STYLE BOTTOM CONTROL BAR
+    ══════════════════════════════════════════════════════ */
+    #meet-controls {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--meet-bar-height);
+      background: var(--meet-bar-bg);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 200;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      gap: 16px;
+    }
+
+    #page-meeting.active ~ #meet-controls,
+    #meet-controls.active { display: flex; }
+
+    /* Left section: time + room code */
+    .ctrl-left {
+      display: flex; align-items: center; gap: 12px;
+      min-width: 160px; flex: 0 0 auto;
+    }
+
+    .ctrl-time {
+      font-size: 0.85rem; color: #e8eaed;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 400; letter-spacing: 0.2px;
+      min-width: 42px;
+    }
+
+    .ctrl-divider {
+      width: 1px; height: 20px; background: rgba(255,255,255,0.2);
+    }
+
+    .ctrl-room-code {
+      font-size: 0.82rem; color: #9aa0a6;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 400; letter-spacing: 0.1px;
+      max-width: 130px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Center section: main controls */
+    .ctrl-center {
+      display: flex; align-items: center; gap: 8px;
+      flex: 1; justify-content: center;
+    }
+
+    /* Right section: utility controls */
+    .ctrl-right {
+      display: flex; align-items: center; gap: 8px;
+      min-width: 160px; flex: 0 0 auto; justify-content: flex-end;
+    }
+
+    /* ── Base control button ── */
+    .ctrl-btn {
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--meet-btn-bg);
+      border: none; cursor: pointer;
+      color: var(--meet-icon);
+      transition: background 0.15s ease, transform 0.1s ease;
+      outline: none;
+      flex-shrink: 0;
+    }
+
+    .ctrl-btn:hover {
+      background: var(--meet-btn-hover);
+    }
+
+    .ctrl-btn:active { transform: scale(0.94); }
+
+    /* Tooltip */
+    .ctrl-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%; transform: translateX(-50%);
+      background: #3c4043;
+      color: #e8eaed;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.75rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 300;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .ctrl-btn:hover::after { opacity: 1; }
+
+    /* OFF state (mic/cam muted) */
+    .ctrl-btn.off {
+      background: var(--meet-btn-off);
+    }
+    .ctrl-btn.off:hover {
+      background: var(--meet-btn-off-hover);
+    }
+
+    /* Active/highlighted state (screen share on, chat open) */
+    .ctrl-btn.on {
+      background: #8ab4f8;
+    }
+    .ctrl-btn.on .material-symbols-rounded { color: #202124; }
+    .ctrl-btn.on:hover { background: #93bbf9; }
+
+    /* End call button — wider pill */
+    .ctrl-btn-end {
+      width: 72px; height: 48px;
+      border-radius: 99px;
+      background: var(--meet-end-bg);
+    }
+    .ctrl-btn-end:hover { background: var(--meet-end-hover); }
+    .ctrl-btn-end .material-symbols-rounded { font-size: 22px; }
+
+    /* Small secondary icon next to some buttons (dropdown arrow) */
+    .ctrl-btn-group {
+      display: flex; align-items: center; gap: 2px;
+    }
+
+    .ctrl-chevron {
+      display: flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: transparent;
+      border: none; cursor: pointer;
+      color: #9aa0a6;
+      margin-left: -4px;
+      transition: color 0.15s;
+    }
+    .ctrl-chevron:hover { color: #e8eaed; }
+    .ctrl-chevron .material-symbols-rounded { font-size: 14px; }
+
+    /* Separator line between center and right sections */
+    .ctrl-section-divider {
+      width: 1px; height: 32px;
+      background: rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+
+    /* Unread chat badge */
+    .chat-badge {
+      position: absolute; top: 6px; right: 6px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); display: none;
+    }
+    .chat-badge.visible { display: block; }
+
+    @media (max-width: 480px) {
+      nav { padding: 16px 20px; }
+      .cards { grid-template-columns: 1fr; }
+      .ctrl-left, .ctrl-right { min-width: 0; }
+      .ctrl-left { display: none; }
+      #meet-controls { padding: 0 12px; gap: 6px; }
+      .ctrl-btn { width: 44px; height: 44px; }
+      .ctrl-btn-end { width: 60px; height: 44px; }
+    }
+
+    /* ══════════════════════════════
+       LOBBY / PRE-JOIN PAGE
+    ══════════════════════════════ */
+    #page-lobby {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      background: #111; align-items: center; justify-content: center;
+      flex-direction: column; gap: 0;
+    }
+    #page-lobby.active { display: flex; }
+
+    .lobby-wrap {
+      display: flex; gap: 40px; align-items: flex-start;
+      width: 100%; max-width: 860px; padding: 24px;
+    }
+
+    /* Left: camera preview */
+    .lobby-preview {
+      flex: 1; position: relative; border-radius: 16px; overflow: hidden;
+      background: #1a1a1a; aspect-ratio: 16/9; min-width: 0;
+    }
+
+    .lobby-preview video {
+      width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1);
+    }
+
+    .lobby-preview .lp-avatar {
+      position: absolute; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      background: #1a1a1a; font-size: 4rem; font-weight: 600;
+      color: var(--accent); font-family: 'Google Sans Display', sans-serif;
+    }
+    .lobby-preview.cam-off .lp-avatar { display: flex; }
+    .lobby-preview.cam-off video { opacity: 0; }
+
+    /* Permission denied banner */
+    .lobby-perm-error {
+      display: none; position: absolute; inset: 0;
+      background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; text-align: center; padding: 20px;
+      border-radius: 16px;
+    }
+    .lobby-perm-error.visible { display: flex; }
+    .lobby-perm-error .material-symbols-rounded { font-size: 36px; color: #ea4335; }
+    .lobby-perm-error p { font-size: 0.88rem; color: #e8eaed; line-height: 1.5; }
+    .lobby-perm-error strong { color: #fff; }
+
+    /* Lobby preview controls (mic/cam toggle) */
+    .lobby-preview-btns {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 10px;
+    }
+
+    .lp-btn {
+      width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(60,64,67,0.9); color: #e8eaed;
+      transition: background 0.15s;
+    }
+    .lp-btn:hover { background: rgba(74,77,81,0.95); }
+    .lp-btn.off { background: rgba(234,67,53,0.9); }
+    .lp-btn .material-symbols-rounded { font-size: 20px; }
+
+    /* Right: join panel */
+    .lobby-panel {
+      width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px;
+      padding-top: 8px;
+    }
+
+    .lobby-panel h2 {
+      font-size: 1.3rem; font-weight: 600; font-family: 'Google Sans Display', sans-serif;
+    }
+
+    .lobby-panel .room-id-display {
+      font-size: 0.82rem; color: #9aa0a6; background: #1e1e1e;
+      border: 1px solid #333; border-radius: 8px; padding: 8px 12px;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    /* Mic level meter */
+    .mic-test-row {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .mic-test-label {
+      font-size: 0.78rem; color: #9aa0a6; font-family: 'Google Sans', sans-serif;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .mic-test-label .material-symbols-rounded { font-size: 16px; }
+    .mic-meter-bar {
+      height: 6px; background: #2a2a2a; border-radius: 99px; overflow: hidden;
+    }
+    .mic-meter-fill {
+      height: 100%; width: 0%; border-radius: 99px;
+      background: linear-gradient(90deg, #22c55e, #86efac);
+      transition: width 0.08s ease;
+    }
+    .mic-no-signal {
+      font-size: 0.75rem; color: #9aa0a6; font-family: 'Google Sans', sans-serif;
+    }
+
+    /* Device selectors */
+    .lobby-selects { display: flex; flex-direction: column; gap: 10px; }
+
+    .lobby-select-row { display: flex; flex-direction: column; gap: 4px; }
+    .lobby-select-row label {
+      font-size: 0.75rem; color: #9aa0a6;
+      font-family: 'Google Sans', sans-serif;
+    }
+    .lobby-select-row select {
+      background: #1e1e1e; border: 1px solid #333; color: #e8eaed;
+      border-radius: 8px; padding: 8px 10px; font-family: 'Google Sans', sans-serif;
+      font-size: 0.82rem; outline: none; cursor: pointer; width: 100%;
+    }
+    .lobby-select-row select:focus { border-color: rgba(34,197,94,0.5); }
+
+    /* Join button */
+    .lobby-join-btn {
+      width: 100%; padding: 12px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000; font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .lobby-join-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .lobby-join-btn:active { transform: scale(0.98); }
+
+    /* Room capacity warning -- amber on dark, contrast ratio 9.6:1 */
+    .lobby-cap-warning {
+      display: flex; gap: 10px;
+      padding: 12px 14px; margin-bottom: 14px;
+      background: rgba(255, 193, 7, 0.08);
+      border: 1px solid rgba(255, 193, 7, 0.4);
+      border-radius: 8px;
+      font-family: 'Google Sans', sans-serif;
+    }
+    .lobby-cap-warning .material-symbols-rounded {
+      color: #ffc107; font-size: 22px; flex-shrink: 0;
+    }
+    .lobby-cap-warning strong {
+      display: block; color: #ffe082;
+      font-size: 0.88rem; font-weight: 600; margin-bottom: 3px;
+    }
+    .lobby-cap-warning p {
+      color: rgba(255, 224, 130, 0.85);
+      font-size: 0.78rem; line-height: 1.4; margin: 0;
+    }
+
+    .lobby-back {
+      text-align: center; font-size: 0.82rem; color: #9aa0a6;
+      cursor: pointer; font-family: 'Google Sans', sans-serif;
+    }
+    .lobby-back:hover { color: #e8eaed; }
+
+    @media (max-width: 640px) {
+      .lobby-wrap { flex-direction: column; gap: 20px; }
+      .lobby-panel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mesh"></div>
+
+<!-- ══ HOME PAGE ══ -->
+<div id="page-home">
+  <nav>
+    <div class="logo">Xolox <span>Meet</span></div>
+  </nav>
+  <div class="hero">
+    <div class="hero-inner">
+      <h1>Meet anyone,<br/><em>anywhere.</em></h1>
+      <div class="cards">
+        <div class="card">
+          <h3>New Meeting</h3>
+          <input type="text" id="name-new" placeholder="Your name"/>
+          <button class="btn btn-primary" onclick="startNew()">Start Meeting</button>
+        </div>
+        <div class="card">
+          <h3>Join Meeting</h3>
+          <input type="text" id="room-join" placeholder="Meeting ID"/>
+          <input type="text" id="name-join" placeholder="Your name"/>
+          <button class="btn btn-ghost" onclick="joinRoom()">Join →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ LOBBY / PRE-JOIN PAGE ══ -->
+<div id="page-lobby">
+  <div class="lobby-wrap">
+    <!-- Camera preview -->
+    <div class="lobby-preview" id="lobby-preview">
+      <video id="lobby-video" autoplay playsinline muted></video>
+      <div class="lp-avatar" id="lobby-avatar">?</div>
+      <div class="lobby-perm-error" id="lobby-perm-error">
+        <span class="material-symbols-rounded">videocam_off</span>
+        <p id="lobby-perm-msg"><strong>Camera & microphone blocked</strong><br/>
+        Click the camera icon in your browser's address bar and allow access, then refresh.</p>
+      </div>
+      <div class="lobby-preview-btns">
+        <button class="lp-btn" id="lp-mic-btn" onclick="lobbyToggleMic()" data-tooltip="Toggle mic">
+          <span class="material-symbols-rounded" id="lp-mic-icon">mic</span>
+        </button>
+        <button class="lp-btn" id="lp-cam-btn" onclick="lobbyToggleCam()" data-tooltip="Toggle camera">
+          <span class="material-symbols-rounded" id="lp-cam-icon">videocam</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Join panel -->
+    <div class="lobby-panel">
+      <h2>Ready to join?</h2>
+      <div class="room-id-display" id="lobby-room-display">—</div>
+
+      <!-- Mic level meter -->
+      <div class="mic-test-row">
+        <div class="mic-test-label">
+          <span class="material-symbols-rounded">mic</span>
+          Microphone level
+        </div>
+        <div class="mic-meter-bar">
+          <div class="mic-meter-fill" id="mic-meter-fill"></div>
+        </div>
+        <div class="mic-no-signal" id="mic-no-signal" style="display:none">
+          No signal — check your mic permissions
+        </div>
+      </div>
+
+      <!-- Device selectors -->
+      <div class="lobby-selects">
+        <div class="lobby-select-row">
+          <label>Camera</label>
+          <select id="lobby-cam-select" onchange="switchCamera(this.value)"></select>
+        </div>
+        <div class="lobby-select-row">
+          <label>Microphone</label>
+          <select id="lobby-mic-select" onchange="switchMic(this.value)"></select>
+        </div>
+      </div>
+
+      <div class="lobby-cap-warning" id="lobby-cap-warning" style="display:none">
+        <span class="material-symbols-rounded" aria-hidden="true">info</span>
+        <div>
+          <strong>This room already has 4 or more people.</strong>
+          <p>Calls may become unstable beyond 4 -- video and audio quality can drop. You can still join.</p>
+        </div>
+      </div>
+
+      <button class="lobby-join-btn" onclick="lobbyJoin()">Join now</button>
+      <div class="lobby-back" onclick="backToHome()">← Back</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MEETING PAGE ══ -->
+<div id="page-meeting">
+  <!-- Slim top bar: logo + room info only -->
+  <div class="meeting-bar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="logo">Xolox <span>Meet</span></div>
+    </div>
+  </div>
+
+  <div id="meeting-content">
+    <div id="video-grid"></div>
+    <div id="chat-panel">
+      <div class="chat-header">
+        In-call messages
+        <span class="chat-close" onclick="toggleChat()">
+          <span class="material-symbols-rounded">close</span>
+        </span>
+      </div>
+      <div id="chat-messages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Send a message…" onkeydown="if(event.key==='Enter')sendChat()"/>
+        <button class="chat-send" onclick="sendChat()">
+          <span class="material-symbols-rounded">send</span>
+        </button>
+      </div>
+    </div>
+    <div id="whiteboard-panel">
+      <div class="wb-header">
+        Shared Whiteboard
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="wb-btn" onclick="clearWhiteboard()">Clear</button>
+          <button class="wb-btn" id="wb-full-btn" onclick="toggleWhiteboardFullscreen()">Fullscreen</button>
+          <span class="chat-close" onclick="toggleWhiteboard(false)">
+            <span class="material-symbols-rounded">close</span>
+          </span>
+        </div>
+      </div>
+      <div class="wb-frame-wrap">
+        <iframe id="whiteboard-frame" src="/whiteboard.html" title="Whiteboard"></iframe>
+      </div>
+    </div>
+    <div id="screen-stage">
+      <video id="screen-stage-video" autoplay playsinline muted></video>
+    </div>
+  </div>
+</div>
+
+<!-- ══ GOOGLE MEET-STYLE BOTTOM CONTROL BAR ══ -->
+<div id="meet-controls">
+  <!-- Left: clock + room code -->
+  <div class="ctrl-left">
+    <span class="ctrl-time" id="ctrl-clock">--:--</span>
+    <div class="ctrl-divider"></div>
+    <span class="ctrl-room-code" id="ctrl-room-display">—</span>
+  </div>
+
+  <!-- Center: main call controls -->
+  <div class="ctrl-center">
+    <!-- Microphone -->
+    <div class="ctrl-btn-group">
+      <button class="ctrl-btn" id="btn-mic" onclick="toggleMic()" data-tooltip="Turn off mic (M)">
+        <span class="material-symbols-rounded" id="icon-mic">mic</span>
+      </button>
+    </div>
+
+    <!-- Camera -->
+    <div class="ctrl-btn-group">
+      <button class="ctrl-btn" id="btn-cam" onclick="toggleCam()" data-tooltip="Turn off camera (V)">
+        <span class="material-symbols-rounded" id="icon-cam">videocam</span>
+      </button>
+    </div>
+
+    <!-- Closed Captions (decorative) -->
+    <button class="ctrl-btn" data-tooltip="Turn on captions (C)" onclick="showToast('Captions coming soon')">
+      <span class="material-symbols-rounded">closed_caption</span>
+    </button>
+
+    <!-- Present / Screen Share -->
+    <button class="ctrl-btn" id="btn-screen" onclick="toggleScreen()" data-tooltip="Present now">
+      <span class="material-symbols-rounded" id="icon-screen">present_to_all</span>
+    </button>
+
+    <!-- Raise Hand (decorative) -->
+    <button class="ctrl-btn" id="btn-hand" data-tooltip="Raise your hand" onclick="toggleHand()">
+      <span class="material-symbols-rounded" id="icon-hand">back_hand</span>
+    </button>
+
+    <!-- Reactions (decorative) -->
+    <button class="ctrl-btn" data-tooltip="Send a reaction" onclick="showToast('Reactions coming soon')">
+      <span class="material-symbols-rounded">sentiment_satisfied</span>
+    </button>
+
+    <!-- More options -->
+    <button class="ctrl-btn" data-tooltip="More options" onclick="showToast('More options coming soon')">
+      <span class="material-symbols-rounded">more_vert</span>
+    </button>
+  </div>
+
+  <!-- Right: utility + end call -->
+  <div class="ctrl-right">
+    <!-- People / participants -->
+    <button class="ctrl-btn" data-tooltip="People" onclick="showToast('Participants panel coming soon')">
+      <span class="material-symbols-rounded">group</span>
+    </button>
+
+    <!-- Chat -->
+    <button class="ctrl-btn" id="btn-chat" onclick="toggleChat()" data-tooltip="Chat with everyone">
+      <span class="material-symbols-rounded">chat_bubble</span>
+      <span class="chat-badge" id="chat-badge"></span>
+    </button>
+
+    <button class="ctrl-btn" id="btn-record" onclick="toggleRecording()" data-tooltip="Start recording" style="display:none">
+      <span class="material-symbols-rounded" id="icon-record">radio_button_checked</span>
+    </button>
+
+    <button class="ctrl-btn" id="btn-whiteboard" onclick="toggleWhiteboard()" data-tooltip="Open whiteboard">
+      <span class="material-symbols-rounded">draw</span>
+    </button>
+
+    <!-- Copy invite link -->
+    <button class="ctrl-btn" onclick="copyLink()" data-tooltip="Copy invite link">
+      <span class="material-symbols-rounded">link</span>
+    </button>
+
+    <div class="ctrl-section-divider"></div>
+
+    <!-- End call -->
+    <button class="ctrl-btn ctrl-btn-end" onclick="leaveMeeting()" data-tooltip="Leave call">
+      <span class="material-symbols-rounded">call_end</span>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let socket, localStream, screenStream;
+let myName = 'Guest', myRoom = '';
+let micOn = true, camOn = true, screenOn = false, handRaised = false;
+let mediaRecorder = null;
+let isRecording = false;
+let recordingSessionId = null;
+let recordingUploadChain = Promise.resolve();
+let roomRecorderSocketId = null;
+let isRoomRecorder = false;
+let displayStream = null;
+let autoRecordPromptAttempted = false;
+let activePresentationMode = null;
+let activePresentationFrom = null;
+let whiteboardReady = false;
+let wbCtx = null;
+let wbDrawing = false;
+let wbLastPoint = null;
+
+// ICE config comes from backend /api/ice-servers.
+// Defaults are free STUN; add your own TURN in backend env for best reliability.
+let ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+  iceCandidatePoolSize: 10,
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require'
+};
+
+async function fetchIceServers() {
+  try {
+    const res = await fetch('/api/ice-servers', { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+        ICE_SERVERS = { ...ICE_SERVERS, iceServers: data.iceServers };
+        console.log('ICE servers loaded from backend:', data.iceServers.length, 'entries');
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Server ICE fetch failed, using STUN defaults:', e.message);
+  }
+}
+
+// ════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    document.getElementById('ctrl-clock').textContent = `${h}:${m}`;
+  }
+  tick();
+  setInterval(tick, 10000);
+}
+
+// ════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function generateRoomId() {
+  const w = ['swift','lunar','nova','echo','zeta','orbit','pulse','forge','nexus','vega'];
+  const p = () => w[Math.floor(Math.random() * w.length)];
+  return `${p()}-${p()}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function updatePeerCount() {
+  // peer count badge removed from top bar
+}
+
+// ════════════════════════════════════════
+// HOME ACTIONS
+// ════════════════════════════════════════
+function startNew() {
+  const name = document.getElementById('name-new').value.trim() || 'Guest';
+  const room = generateRoomId();
+  goToLobby(room, name);
+}
+
+function joinRoom() {
+  let room = document.getElementById('room-join').value.trim();
+  const name = document.getElementById('name-join').value.trim() || 'Guest';
+  if (!room) { showToast('Enter a meeting ID'); return; }
+  goToLobby(room, name);
+}
+
+// ════════════════════════════════════════
+// LOBBY
+// ════════════════════════════════════════
+let lobbyStream = null;
+let micAnalyser = null, micAnimFrame = null;
+let lobbyMicOn = true, lobbyCamOn = true;
+let pendingRoom = '', pendingName = '';
+let lobbyAtCap = false;
+let lobbyCapConfirmed = false;
+
+async function goToLobby(roomId, name) {
+  pendingRoom = roomId;
+  pendingName = name;
+
+  document.getElementById('page-home').style.display = 'none';
+  document.getElementById('page-lobby').classList.add('active');
+  document.getElementById('lobby-room-display').textContent = roomId;
+  document.getElementById('lobby-avatar').textContent = (name || 'G')[0].toUpperCase();
+
+  history.pushState({}, '', `?room=${roomId}`);
+
+  // Check room capacity and show warning if at/over the soft cap (4)
+  try {
+    const res = await fetch(`/api/room-size/${encodeURIComponent(roomId)}`);
+    const { isAtCap } = await res.json();
+    lobbyAtCap = !!isAtCap;
+    lobbyCapConfirmed = false;
+    document.getElementById('lobby-cap-warning').style.display = lobbyAtCap ? 'flex' : 'none';
+  } catch(_) {
+    lobbyAtCap = false;
+    lobbyCapConfirmed = false;
+    document.getElementById('lobby-cap-warning').style.display = 'none';
+  }
+
+  const joinBtn = document.querySelector('.lobby-join-btn');
+  if (joinBtn) {
+    joinBtn.textContent = lobbyAtCap ? 'Join anyway' : 'Join now';
+  }
+
+  await fetchIceServers();  // load fresh TURN credentials before call
+  await lobbyRequestPermissions();
+  await populateDevices();
+}
+
+async function lobbyRequestPermissions() {
+  const permError = document.getElementById('lobby-perm-error');
+  const permMsg = document.getElementById('lobby-perm-msg');
+  const preview = document.getElementById('lobby-preview');
+  permError.classList.remove('visible');
+
+  // Camera/mic require a secure context (HTTPS or localhost).
+  // Accessing via a LAN IP (e.g. 192.168.x.x) over plain HTTP will always fail.
+  if (!window.isSecureContext) {
+    lobbyStream = new MediaStream();
+    preview.classList.add('cam-off');
+    lobbyCamOn = false;
+    lobbyMicOn = false;
+    updateLobbyBtnState();
+    if (permMsg) permMsg.innerHTML =
+      '<strong>Camera & mic blocked by browser.</strong><br>' +
+      'Your browser only allows camera/mic access on <code>localhost</code> or an <strong>HTTPS</strong> connection.<br>' +
+      'Open this page at <code>http://localhost:3000</code> on the same machine, ' +
+      'or set up HTTPS (see README) to use it over your network.';
+    permError.classList.add('visible');
+    document.getElementById('mic-no-signal').style.display = 'block';
+    return;
+  }
+
+  // Check if mediaDevices API is available at all
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    lobbyStream = new MediaStream();
+    preview.classList.add('cam-off');
+    lobbyCamOn = false;
+    lobbyMicOn = false;
+    updateLobbyBtnState();
+    if (permMsg) permMsg.innerHTML =
+      '<strong>Camera & mic not available.</strong><br>' +
+      'Your browser does not support media devices on this connection. ' +
+      'Try Chrome or Firefox over <code>localhost</code> or HTTPS.';
+    permError.classList.add('visible');
+    document.getElementById('mic-no-signal').style.display = 'block';
+    return;
+  }
+
+  try {
+    lobbyStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('lobby-video').srcObject = lobbyStream;
+    preview.classList.remove('cam-off');
+    startMicMeter(lobbyStream);
+    document.getElementById('mic-no-signal').style.display = 'none';
+  } catch (e) {
+    // Try audio only
+    try {
+      lobbyStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      preview.classList.add('cam-off');
+      lobbyCamOn = false;
+      updateLobbyBtnState();
+      startMicMeter(lobbyStream);
+      document.getElementById('mic-no-signal').style.display = 'none';
+    } catch (e2) {
+      // Both denied — show a helpful, specific error message
+      lobbyStream = new MediaStream();
+      preview.classList.add('cam-off');
+      lobbyCamOn = false;
+      lobbyMicOn = false;
+      updateLobbyBtnState();
+      let msg = '<strong>Camera & mic access denied.</strong><br>';
+      if (e2.name === 'NotAllowedError' || e2.name === 'PermissionDeniedError') {
+        msg += 'Click the camera icon in your browser\'s address bar and allow access, then refresh this page.';
+      } else if (e2.name === 'NotFoundError' || e2.name === 'DevicesNotFoundError') {
+        msg += 'No camera or microphone detected. Connect a device and refresh.';
+      } else if (e2.name === 'NotReadableError' || e2.name === 'TrackStartError') {
+        msg += 'Your camera or mic is already in use by another app. Close it and refresh.';
+      } else {
+        msg += 'Error: ' + (e2.message || e2.name || 'Unknown error') + '. You can still join without media.';
+      }
+      if (permMsg) permMsg.innerHTML = msg;
+      permError.classList.add('visible');
+      document.getElementById('mic-no-signal').style.display = 'block';
+    }
+  }
+}
+
+function startMicMeter(stream) {
+  if (micAnimFrame) cancelAnimationFrame(micAnimFrame);
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(stream);
+    micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 256;
+    src.connect(micAnalyser);
+    const data = new Uint8Array(micAnalyser.frequencyBinCount);
+    const fill = document.getElementById('mic-meter-fill');
+    let silenceCount = 0;
+
+    function draw() {
+      micAnimFrame = requestAnimationFrame(draw);
+      micAnalyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      const pct = Math.min(100, avg * 2.5);
+      fill.style.width = pct + '%';
+      silenceCount = pct < 2 ? silenceCount + 1 : 0;
+      document.getElementById('mic-no-signal').style.display = silenceCount > 60 ? 'block' : 'none';
+    }
+    draw();
+  } catch(e) {}
+}
+
+function lobbyToggleMic() {
+  lobbyMicOn = !lobbyMicOn;
+  lobbyStream.getAudioTracks().forEach(t => t.enabled = lobbyMicOn);
+  updateLobbyBtnState();
+}
+
+function lobbyToggleCam() {
+  lobbyCamOn = !lobbyCamOn;
+  lobbyStream.getVideoTracks().forEach(t => t.enabled = lobbyCamOn);
+  document.getElementById('lobby-preview').classList.toggle('cam-off', !lobbyCamOn);
+  updateLobbyBtnState();
+}
+
+function updateLobbyBtnState() {
+  const mb = document.getElementById('lp-mic-btn');
+  const cb = document.getElementById('lp-cam-btn');
+  mb.classList.toggle('off', !lobbyMicOn);
+  cb.classList.toggle('off', !lobbyCamOn);
+  document.getElementById('lp-mic-icon').textContent = lobbyMicOn ? 'mic' : 'mic_off';
+  document.getElementById('lp-cam-icon').textContent = lobbyCamOn ? 'videocam' : 'videocam_off';
+}
+
+async function populateDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const camSel = document.getElementById('lobby-cam-select');
+    const micSel = document.getElementById('lobby-mic-select');
+    camSel.innerHTML = '';
+    micSel.innerHTML = '';
+
+    devices.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `${d.kind} (${d.deviceId.slice(0,8)})`;
+      if (d.kind === 'videoinput') camSel.appendChild(opt);
+      if (d.kind === 'audioinput') micSel.appendChild(opt);
+    });
+
+    // Mark currently active devices
+    const vTrack = lobbyStream?.getVideoTracks()[0];
+    const aTrack = lobbyStream?.getAudioTracks()[0];
+    if (vTrack) {
+      const settings = vTrack.getSettings();
+      if (settings.deviceId) camSel.value = settings.deviceId;
+    }
+    if (aTrack) {
+      const settings = aTrack.getSettings();
+      if (settings.deviceId) micSel.value = settings.deviceId;
+    }
+  } catch(e) {}
+}
+
+async function switchCamera(deviceId) {
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio: false });
+    const newTrack = newStream.getVideoTracks()[0];
+    lobbyStream.getVideoTracks().forEach(t => { t.stop(); lobbyStream.removeTrack(t); });
+    lobbyStream.addTrack(newTrack);
+    document.getElementById('lobby-video').srcObject = lobbyStream;
+  } catch(e) { showToast('Could not switch camera'); }
+}
+
+async function switchMic(deviceId) {
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } }, video: false });
+    const newTrack = newStream.getAudioTracks()[0];
+    lobbyStream.getAudioTracks().forEach(t => { t.stop(); lobbyStream.removeTrack(t); });
+    lobbyStream.addTrack(newTrack);
+    startMicMeter(lobbyStream);
+  } catch(e) { showToast('Could not switch microphone'); }
+}
+
+function lobbyJoin() {
+  // Require one explicit acknowledgment when room is already above soft cap.
+  if (lobbyAtCap && !lobbyCapConfirmed) {
+    lobbyCapConfirmed = true;
+    const joinBtn = document.querySelector('.lobby-join-btn');
+    if (joinBtn) joinBtn.textContent = 'Confirm and join';
+    showToast('Room is crowded. Click again to confirm and join.');
+    return;
+  }
+  if (micAnimFrame) { cancelAnimationFrame(micAnimFrame); micAnimFrame = null; }
+  document.getElementById('lobby-video').srcObject = null;
+  document.getElementById('page-lobby').classList.remove('active');
+  enterMeeting(pendingRoom, pendingName, lobbyStream, lobbyMicOn, lobbyCamOn);
+}
+
+function backToHome() {
+  if (micAnimFrame) { cancelAnimationFrame(micAnimFrame); micAnimFrame = null; }
+  lobbyStream?.getTracks().forEach(t => t.stop());
+  lobbyStream = null;
+  document.getElementById('page-lobby').classList.remove('active');
+  document.getElementById('page-home').style.display = 'flex';
+  history.pushState({}, '', window.location.pathname);
+}
+
+// ════════════════════════════════════════
+// ENTER MEETING
+// ════════════════════════════════════════
+async function enterMeeting(roomId, name, stream, micEnabled, camEnabled) {
+  myName = name;
+  myRoom = roomId;
+
+  // Use stream from lobby, or request fresh if none
+  if (stream && stream.getTracks().length > 0) {
+    localStream = stream;
+  } else {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    } catch(e) {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+      } catch(e2) {
+        localStream = new MediaStream();
+      }
+    }
+  }
+
+  // Sync mic/cam state from lobby
+  micOn = micEnabled !== undefined ? micEnabled : true;
+  camOn = camEnabled !== undefined ? camEnabled : true;
+  localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+
+  document.getElementById('page-meeting').classList.add('active');
+  document.getElementById('meet-controls').classList.add('active');
+  document.getElementById('ctrl-room-display').textContent = roomId;
+
+  // Sync button states
+  const micBtn = document.getElementById('btn-mic');
+  const camBtn = document.getElementById('btn-cam');
+  micBtn.classList.toggle('off', !micOn);
+  document.getElementById('icon-mic').textContent = micOn ? 'mic' : 'mic_off';
+  camBtn.classList.toggle('off', !camOn);
+  document.getElementById('icon-cam').textContent = camOn ? 'videocam' : 'videocam_off';
+
+  startClock();
+
+  const localTile = addVideoTile('local', localStream, myName, true);
+  if (!camOn) document.getElementById('tile-local')?.classList.add('cam-off');
+  if (!micOn) document.getElementById('tile-local')?.classList.add('mic-off');
+
+  socket = io();
+  setupSocketEvents();
+  socket.emit('join-room', { roomId, userName: name });
+  applyPresentationLayout();
+  // WebRTC peer connections get created in the existing-peers/peer-joined handlers
+}
+
+// ════════════════════════════════════════
+// VIDEO TILES
+// ════════════════════════════════════════
+function addVideoTile(id, stream, name, isLocal) {
+  const grid = document.getElementById('video-grid');
+  const tile = document.createElement('div');
+  tile.className = 'video-tile';
+  tile.id = `tile-${id}`;
+
+  const initial = (name || 'G')[0].toUpperCase();
+
+  tile.innerHTML = `
+    <video autoplay playsinline ${isLocal ? 'muted' : ''}></video>
+    <div class="avatar">${initial}</div>
+    <div class="name-tag">${name}${isLocal ? ' (You)' : ''}</div>
+    <div class="muted-icon"><span class="material-symbols-rounded">mic_off</span></div>
+    <div class="conn-state"></div>
+  `;
+
+  const video = tile.querySelector('video');
+  if (stream) {
+    video.srcObject = stream;
+    video.play().catch(() => {
+      const unlock = () => { video.play(); document.removeEventListener('click', unlock); };
+      document.addEventListener('click', unlock);
+    });
+  }
+  // Remote peers get srcObject set later via pc.ontrack. No cam-off here --
+  // the WebRTC connection-state UI (tile-connecting) handles the empty state.
+  grid.appendChild(tile);
+}
+
+function removeTile(id) {
+  document.getElementById(`tile-${id}`)?.remove();
+}
+
+function addChatMsg(sender, text, isSystem) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isSystem ? ' system' : '');
+  if (isSystem) {
+    div.textContent = text;
+  } else {
+    const senderDiv = document.createElement('div');
+    senderDiv.className = 'sender';
+    senderDiv.textContent = sender || 'Guest';
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text';
+    textDiv.textContent = text;
+    div.appendChild(senderDiv);
+    div.appendChild(textDiv);
+  }
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function setupWhiteboardIfNeeded() {
+  if (whiteboardReady) return;
+  const canvas = document.getElementById('whiteboard-canvas');
+  if (!canvas) return;
+  wbCtx = canvas.getContext('2d');
+  whiteboardReady = true;
+  resizeWhiteboardCanvas();
+  window.addEventListener('resize', () => {
+    if (document.getElementById('whiteboard-panel').classList.contains('open')) {
+      resizeWhiteboardCanvas();
+    }
+  });
+
+  const getPoint = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const source = ev.touches?.[0] || ev;
+    return {
+      x: Math.max(0, Math.min(rect.width, source.clientX - rect.left)),
+      y: Math.max(0, Math.min(rect.height, source.clientY - rect.top)),
+      w: rect.width,
+      h: rect.height
+    };
+  };
+
+  const start = (ev) => {
+    ev.preventDefault();
+    wbDrawing = true;
+    wbLastPoint = getPoint(ev);
+  };
+
+  const move = (ev) => {
+    if (!wbDrawing) return;
+    ev.preventDefault();
+    const p = getPoint(ev);
+    const color = document.getElementById('wb-color').value;
+    const size = Number(document.getElementById('wb-size').value || 3);
+    drawWhiteboardSegment({ x1: wbLastPoint.x, y1: wbLastPoint.y, x2: p.x, y2: p.y, color, size });
+    socket?.emit('whiteboard-draw', {
+      roomId: myRoom,
+      segment: {
+        x1: wbLastPoint.x / wbLastPoint.w,
+        y1: wbLastPoint.y / wbLastPoint.h,
+        x2: p.x / p.w,
+        y2: p.y / p.h,
+        color,
+        size
+      }
+    });
+    wbLastPoint = p;
+  };
+
+  const end = () => {
+    wbDrawing = false;
+    wbLastPoint = null;
+  };
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('touchend', end);
+}
+
+function resizeWhiteboardCanvas() {
+  const canvas = document.getElementById('whiteboard-canvas');
+  if (!canvas || !wbCtx) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return;
+
+  const prev = document.createElement('canvas');
+  prev.width = canvas.width || 1;
+  prev.height = canvas.height || 1;
+  const prevCtx = prev.getContext('2d');
+  if (canvas.width > 0 && canvas.height > 0) {
+    prevCtx.drawImage(canvas, 0, 0);
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  wbCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  wbCtx.fillStyle = '#ffffff';
+  wbCtx.fillRect(0, 0, rect.width, rect.height);
+  wbCtx.drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, rect.width, rect.height);
+}
+
+function drawWhiteboardSegment(seg) {
+  if (!wbCtx) return;
+  wbCtx.strokeStyle = seg.color || '#0f172a';
+  wbCtx.lineWidth = Number(seg.size || 3);
+  wbCtx.lineCap = 'round';
+  wbCtx.lineJoin = 'round';
+  wbCtx.beginPath();
+  wbCtx.moveTo(seg.x1, seg.y1);
+  wbCtx.lineTo(seg.x2, seg.y2);
+  wbCtx.stroke();
+}
+
+function drawWhiteboardSegmentNormalized(seg) {
+  const canvas = document.getElementById('whiteboard-canvas');
+  if (!canvas || !wbCtx) return;
+  const rect = canvas.getBoundingClientRect();
+  drawWhiteboardSegment({
+    x1: seg.x1 * rect.width,
+    y1: seg.y1 * rect.height,
+    x2: seg.x2 * rect.width,
+    y2: seg.y2 * rect.height,
+    color: seg.color,
+    size: seg.size
+  });
+}
+
+function clearWhiteboardLocal() {
+  const canvas = document.getElementById('whiteboard-canvas');
+  if (!canvas || !wbCtx) return;
+  const rect = canvas.getBoundingClientRect();
+  wbCtx.fillStyle = '#ffffff';
+  wbCtx.fillRect(0, 0, rect.width, rect.height);
+}
+
+function toggleWhiteboard(forceOpen) {
+  const panel = document.getElementById('whiteboard-panel');
+  const btn = document.getElementById('btn-whiteboard');
+  const meeting = document.getElementById('page-meeting');
+  if (!panel || !btn) return;
+  const isOpen = typeof forceOpen === 'boolean'
+    ? (forceOpen ? (panel.classList.add('open'), true) : (panel.classList.remove('open'), false))
+    : panel.classList.toggle('open');
+  btn.classList.toggle('on', isOpen);
+  btn.dataset.tooltip = isOpen ? 'Close whiteboard' : 'Open whiteboard';
+  if (isOpen) {
+    document.getElementById('chat-panel').classList.remove('open');
+    document.getElementById('btn-chat').classList.remove('on');
+    setupWhiteboardIfNeeded();
+    setTimeout(() => resizeWhiteboardCanvas(), 0);
+    activePresentationMode = 'whiteboard';
+    activePresentationFrom = socket?.id || null;
+    socket?.emit('presentation-start', { roomId: myRoom, mode: 'whiteboard' });
+    const frame = document.getElementById('whiteboard-frame');
+    frame?.contentWindow?.postMessage({ type: 'WB_SNAPSHOT_REQUEST' }, '*');
+  } else {
+    panel.classList.remove('fullscreen');
+    const fullBtn = document.getElementById('wb-full-btn');
+    if (fullBtn) fullBtn.textContent = 'Fullscreen';
+    if (activePresentationFrom === socket?.id && activePresentationMode === 'whiteboard') {
+      activePresentationMode = null;
+      activePresentationFrom = null;
+      socket?.emit('presentation-stop', { roomId: myRoom });
+    }
+  }
+  applyPresentationLayout();
+}
+
+function toggleWhiteboardFullscreen() {
+  const panel = document.getElementById('whiteboard-panel');
+  const btn = document.getElementById('wb-full-btn');
+  if (!panel || !btn) return;
+  const full = panel.classList.toggle('fullscreen');
+  btn.textContent = full ? 'Exit Full' : 'Fullscreen';
+}
+
+function applyPresentationLayout() {
+  const meeting = document.getElementById('page-meeting');
+  const wbPanel = document.getElementById('whiteboard-panel');
+  const screenStage = document.getElementById('screen-stage');
+  const stageVideo = document.getElementById('screen-stage-video');
+  if (!meeting || !wbPanel || !screenStage || !stageVideo) return;
+
+  const whiteboardOpen = wbPanel.classList.contains('open');
+  const remoteScreenOpen = activePresentationMode === 'screen' && !!activePresentationFrom && activePresentationFrom !== socket?.id;
+  const localScreenOpen = !!screenOn;
+  const stageOpen = (localScreenOpen || remoteScreenOpen) && !whiteboardOpen;
+  meeting.classList.toggle('presentation-active', whiteboardOpen || stageOpen);
+  screenStage.classList.toggle('open', stageOpen);
+
+  if (stageOpen) {
+    if (remoteScreenOpen) {
+      const remoteVideo = document.querySelector(`#tile-${activePresentationFrom} video`);
+      stageVideo.srcObject = remoteVideo?.srcObject || null;
+    } else {
+      const localVideo = document.querySelector('#tile-local video');
+      stageVideo.srcObject = localVideo?.srcObject || null;
+    }
+  } else {
+    stageVideo.srcObject = null;
+  }
+}
+
+function clearWhiteboard() {
+  const frame = document.getElementById('whiteboard-frame');
+  frame?.contentWindow?.postMessage({ type: 'WB_CLEAR' }, '*');
+}
+
+window.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'WB_STATE_UPDATE' && data.dataUrl && socket && myRoom) {
+    socket.emit('whiteboard-state', { roomId: myRoom, dataUrl: data.dataUrl });
+  }
+});
+
+async function startAutoRecording() {
+  if (isRecording || !isRoomRecorder) return;
+  if (typeof MediaRecorder === 'undefined') {
+    showToast('Recording not supported in this browser');
+    return;
+  }
+  try {
+    displayStream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        frameRate: 15,
+        displaySurface: 'browser'
+      },
+      audio: true,
+      preferCurrentTab: true,
+      selfBrowserSurface: 'include',
+      surfaceSwitching: 'exclude',
+      monitorTypeSurfaces: 'exclude'
+    });
+    const vTrack = displayStream.getVideoTracks()[0];
+    if (vTrack) {
+      vTrack.onended = () => {
+        if (isRecording) stopAutoRecording();
+      };
+    }
+  } catch (e) {
+    showToast('Please allow tab/screen share to record the meeting screen');
+    return;
+  }
+
+  const streamToRecord = displayStream;
+  if (!streamToRecord || streamToRecord.getTracks().length === 0) return;
+
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+    ? 'video/webm;codecs=vp9,opus'
+    : 'video/webm;codecs=vp8,opus';
+
+  try {
+    const startResp = await fetch('/api/recordings/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: myRoom, userName: myName, mimeType, recorderSocketId: socket?.id })
+    });
+    const startData = await startResp.json();
+    if (!startResp.ok) throw new Error(startData.error || 'Failed to start recording');
+    recordingSessionId = startData.sessionId;
+  } catch (e) {
+    console.warn('Recording start failed:', e);
+    showToast('Could not start auto recording');
+    return;
+  }
+
+  mediaRecorder = new MediaRecorder(streamToRecord, { mimeType });
+  mediaRecorder.ondataavailable = (ev) => {
+    if (!ev.data || ev.data.size === 0 || !recordingSessionId) return;
+    recordingUploadChain = recordingUploadChain.then(async () => {
+      const buf = await ev.data.arrayBuffer();
+      await fetch(`/api/recordings/chunk/${recordingSessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buf
+      });
+    }).catch((err) => console.warn('Recording chunk upload failed:', err));
+  };
+  mediaRecorder.onstop = async () => {
+    const id = recordingSessionId;
+    recordingSessionId = null;
+    if (!id) return;
+    await recordingUploadChain.catch(() => {});
+    try {
+      await fetch(`/api/recordings/stop/${id}`, { method: 'POST' });
+      showToast('Recording saved. Transcript is processing.');
+    } catch (e) {
+      console.warn('Recording stop failed:', e);
+    } finally {
+      displayStream?.getTracks().forEach((t) => t.stop());
+      displayStream = null;
+    }
+  };
+
+  mediaRecorder.start(3000);
+  isRecording = true;
+  const btn = document.getElementById('btn-record');
+  const icon = document.getElementById('icon-record');
+  if (btn) {
+    btn.classList.add('on');
+    btn.dataset.tooltip = 'Stop recording';
+  }
+  if (icon) icon.textContent = 'stop_circle';
+}
+
+function stopAutoRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+  const btn = document.getElementById('btn-record');
+  const icon = document.getElementById('icon-record');
+  if (btn) {
+    btn.classList.remove('on');
+    btn.dataset.tooltip = 'Start recording';
+  }
+  if (icon) icon.textContent = 'radio_button_checked';
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  mediaRecorder = null;
+}
+
+function toggleRecording() {
+  if (!isRoomRecorder) {
+    showToast('Only the designated room recorder can record');
+    return;
+  }
+  if (isRecording) {
+    stopAutoRecording();
+    showToast('Recording stopped');
+  } else {
+    startAutoRecording();
+    showToast('Recording started');
+  }
+}
+
+// ════════════════════════════════════════
+// WEBRTC TRANSPORT (mesh peer-to-peer)
+// ════════════════════════════════════════
+// ICE_SERVERS is defined above. For strict NATs, configure TURN on the backend via env vars.
+
+const peers = {};           // peerId -> { name }
+const peerConnections = {}; // peerId -> RTCPeerConnection
+const pendingCandidates = {}; // peerId -> [candidate] -- buffered until remote desc set
+
+// Create an RTCPeerConnection for a peer.
+// isInitiator: true if we should send the offer. The peer who joined LATER initiates.
+function createPeerConnection(peerId, isInitiator) {
+  if (peerConnections[peerId]) return peerConnections[peerId];
+
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConnections[peerId] = pc;
+
+  // Add all local tracks (audio + video). These get sent to the peer.
+  if (localStream) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  }
+
+  // Wire up remote stream arrival
+  pc.ontrack = (event) => {
+    const tile = document.getElementById(`tile-${peerId}`);
+    if (!tile) return;
+    const video = tile.querySelector('video');
+    if (video && video.srcObject !== event.streams[0]) {
+      video.srcObject = event.streams[0];
+      video.muted = false;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.play().catch(() => {
+        // Autoplay blocked -- attach unlock listener on any user gesture
+        const unlock = () => {
+          video.play().catch(() => {});
+          document.removeEventListener('click', unlock);
+          document.removeEventListener('touchstart', unlock);
+        };
+        document.addEventListener('click', unlock);
+        document.addEventListener('touchstart', unlock);
+      });
+    }
+  };
+
+  // Forward ICE candidates to the peer via socket
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('ice-candidate', { to: peerId, candidate: event.candidate });
+    }
+  };
+
+  // Update tile UI based on connection state
+  // Auto-restart ICE on failure — handles temporary network glitches
+  // without requiring a full page refresh
+  let iceRestartTimer = null;
+  pc.onconnectionstatechange = () => {
+    const tile = document.getElementById(`tile-${peerId}`);
+    if (!tile) return;
+    const state = pc.connectionState;
+    tile.classList.remove('tile-connecting', 'tile-failed');
+    if (state === 'connecting' || state === 'new') {
+      tile.classList.add('tile-connecting');
+    } else if (state === 'connected') {
+      clearTimeout(iceRestartTimer);
+    } else if (state === 'failed') {
+      tile.classList.add('tile-failed');
+      // Try ICE restart automatically after 2s on either side.
+      clearTimeout(iceRestartTimer);
+      iceRestartTimer = setTimeout(async () => {
+        if (pc.signalingState !== 'stable') return;
+        try {
+          console.log('ICE restart for', peerId);
+          const offer = await pc.createOffer({ iceRestart: true });
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', { to: peerId, offer });
+        } catch(e) { console.warn('ICE restart failed:', e); }
+      }, 2000);
+    } else if (state === 'disconnected') {
+      tile.classList.add('tile-failed');
+    }
+  };
+
+  // Renegotiate when tracks change (screen share, device switch).
+  pc.onnegotiationneeded = async () => {
+    if (!isInitiator || pc.signalingState !== 'stable') return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { to: peerId, offer });
+    } catch (err) {
+      console.error('Renegotiation failed:', err);
+    }
+  };
+
+  // Send an explicit first offer for deterministic two-way connect.
+  if (isInitiator) {
+    setTimeout(async () => {
+      if (pc.signalingState !== 'stable') return;
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('offer', { to: peerId, offer });
+      } catch (err) {
+        console.error('Initial offer creation failed:', err);
+      }
+    }, 0);
+  }
+  return pc;
+}
+
+function closePeerConnection(peerId) {
+  const pc = peerConnections[peerId];
+  if (pc) {
+    pc.onicecandidate = null;
+    pc.ontrack = null;
+    pc.onconnectionstatechange = null;
+    try { pc.close(); } catch(_) {}
+    delete peerConnections[peerId];
+  }
+  delete pendingCandidates[peerId];
+}
+
+// ════════════════════════════════════════
+// SOCKET EVENTS
+// ════════════════════════════════════════
+function setupSocketEvents() {
+  socket.on('existing-peers', (peerList) => {
+    // We joined later, so WE initiate the connection to each existing peer
+    peerList.forEach(({ peerId, userName }) => {
+      peers[peerId] = { name: userName };
+      addVideoTile(peerId, null, userName, false);
+      document.getElementById(`tile-${peerId}`)?.classList.add('tile-connecting');
+      createPeerConnection(peerId, true);
+    });
+  });
+
+  socket.on('peer-joined', ({ peerId, userName }) => {
+    addChatMsg(null, `${userName} joined`, true);
+    if (!peers[peerId]) {
+      peers[peerId] = { name: userName };
+      addVideoTile(peerId, null, userName, false);
+    }
+    document.getElementById(`tile-${peerId}`)?.classList.add('tile-connecting');
+    // They joined later, THEY initiate. We just prepare to receive their offer.
+    createPeerConnection(peerId, false);
+  });
+
+  socket.on('offer', async ({ from, offer }) => {
+    let pc = peerConnections[from];
+    if (!pc) {
+      // Edge case: offer arrived before peer-joined fired. Create as receiver.
+      pc = createPeerConnection(from, false);
+    }
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      // Drain any ICE candidates that arrived before remote desc was set
+      if (pendingCandidates[from]) {
+        for (const c of pendingCandidates[from]) {
+          try { await pc.addIceCandidate(c); } catch(e) { console.warn('Buffered ICE failed:', e); }
+        }
+        delete pendingCandidates[from];
+      }
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', { to: from, answer });
+    } catch (err) {
+      console.error('Offer handling failed:', err);
+    }
+  });
+
+  socket.on('answer', async ({ from, answer }) => {
+    const pc = peerConnections[from];
+    if (!pc) return;
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (pendingCandidates[from]) {
+        for (const c of pendingCandidates[from]) {
+          try { await pc.addIceCandidate(c); } catch(e) { console.warn('Buffered ICE failed:', e); }
+        }
+        delete pendingCandidates[from];
+      }
+    } catch (err) {
+      console.error('Answer handling failed:', err);
+    }
+  });
+
+  socket.on('ice-candidate', async ({ from, candidate }) => {
+    const pc = peerConnections[from];
+    if (!pc || !pc.remoteDescription) {
+      // Buffer until remote description is set
+      if (!pendingCandidates[from]) pendingCandidates[from] = [];
+      pendingCandidates[from].push(candidate);
+      return;
+    }
+    try {
+      await pc.addIceCandidate(candidate);
+    } catch (err) {
+      console.warn('ICE candidate failed:', err);
+    }
+  });
+
+  socket.on('peer-left', ({ peerId, userName }) => {
+    addChatMsg(null, `${userName} left`, true);
+    closePeerConnection(peerId);
+    delete peers[peerId];
+    removeTile(peerId);
+  });
+
+  socket.on('chat-message', ({ name, text }) => {
+    if (name === myName) return;
+    addChatMsg(name, text, false);
+    if (!document.getElementById('chat-panel').classList.contains('open')) {
+      document.getElementById('chat-badge')?.classList.add('visible');
+    }
+  });
+
+  socket.on('room-recorder', ({ recorderSocketId }) => {
+    roomRecorderSocketId = recorderSocketId || null;
+    isRoomRecorder = socket?.id && roomRecorderSocketId === socket.id;
+    const btn = document.getElementById('btn-record');
+    if (!btn) return;
+    if (isRoomRecorder) {
+      btn.style.display = 'flex';
+      btn.dataset.tooltip = isRecording ? 'Stop recording' : 'Start recording';
+      showToast('You are the meeting recorder');
+      if (!autoRecordPromptAttempted && !isRecording) {
+        autoRecordPromptAttempted = true;
+        startAutoRecording().catch(() => {});
+      }
+    } else {
+      if (isRecording) stopAutoRecording();
+      btn.style.display = 'none';
+    }
+  });
+
+  socket.on('whiteboard-sync', () => {});
+  socket.on('whiteboard-draw', () => {});
+  socket.on('whiteboard-clear', () => {});
+  socket.on('whiteboard-state', ({ dataUrl }) => {
+    const frame = document.getElementById('whiteboard-frame');
+    frame?.contentWindow?.postMessage({ type: 'WB_APPLY_STATE', dataUrl }, '*');
+  });
+
+  socket.on('presentation-start', ({ mode, from }) => {
+    activePresentationMode = mode || null;
+    activePresentationFrom = from || null;
+    if (mode === 'whiteboard' && from !== socket?.id) {
+      const panel = document.getElementById('whiteboard-panel');
+      const btn = document.getElementById('btn-whiteboard');
+      if (panel && btn) {
+        panel.classList.add('open');
+        btn.classList.add('on');
+        btn.dataset.tooltip = 'Close whiteboard';
+      }
+    }
+    applyPresentationLayout();
+  });
+
+  socket.on('presentation-stop', () => {
+    if (activePresentationMode === 'whiteboard' && activePresentationFrom && activePresentationFrom !== socket?.id) {
+      const panel = document.getElementById('whiteboard-panel');
+      const btn = document.getElementById('btn-whiteboard');
+      if (panel && btn) {
+        panel.classList.remove('open');
+        panel.classList.remove('fullscreen');
+        btn.classList.remove('on');
+        btn.dataset.tooltip = 'Open whiteboard';
+      }
+    }
+    activePresentationMode = null;
+    activePresentationFrom = null;
+    applyPresentationLayout();
+  });
+}
+
+// ════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════
+function toggleMic() {
+  micOn = !micOn;
+  localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  const btn = document.getElementById('btn-mic');
+  const icon = document.getElementById('icon-mic');
+  btn.classList.toggle('off', !micOn);
+  btn.dataset.tooltip = micOn ? 'Turn off mic (M)' : 'Turn on mic (M)';
+  icon.textContent = micOn ? 'mic' : 'mic_off';
+  document.getElementById('tile-local')?.classList.toggle('mic-off', !micOn);
+}
+
+function toggleCam() {
+  camOn = !camOn;
+  localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+  const btn = document.getElementById('btn-cam');
+  const icon = document.getElementById('icon-cam');
+  btn.classList.toggle('off', !camOn);
+  btn.dataset.tooltip = camOn ? 'Turn off camera (V)' : 'Turn on camera (V)';
+  icon.textContent = camOn ? 'videocam' : 'videocam_off';
+  document.getElementById('tile-local')?.classList.toggle('cam-off', !camOn);
+}
+
+async function toggleScreen() {
+  if (!screenOn) {
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const screenTrack = screenStream.getVideoTracks()[0];
+
+      // Replace the outgoing video track in every peer connection.
+      // This triggers ICE renegotiation automatically via onnegotiationneeded.
+      Object.values(peerConnections).forEach(pc => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(screenTrack);
+      });
+
+      // Update our local preview to show what we're sharing
+      const localVideo = document.querySelector('#tile-local video');
+      if (localVideo) {
+        const previewStream = new MediaStream([screenTrack, ...localStream.getAudioTracks()]);
+        localVideo.srcObject = previewStream;
+      }
+
+      // Browser-level "Stop sharing" button hooks back into our toggle
+      screenTrack.onended = () => { if (screenOn) toggleScreen(); };
+      screenOn = true;
+      activePresentationMode = 'screen';
+      activePresentationFrom = socket?.id || null;
+      socket?.emit('presentation-start', { roomId: myRoom, mode: 'screen' });
+      const btn = document.getElementById('btn-screen');
+      btn.classList.add('on');
+      btn.dataset.tooltip = 'Stop presenting';
+      document.getElementById('icon-screen').textContent = 'cancel_presentation';
+      showToast('Screen sharing started');
+      applyPresentationLayout();
+    } catch (e) {
+      showToast('Screen share cancelled');
+      applyPresentationLayout();
+    }
+  } else {
+    // Revert all peer connections to camera track
+    const camTrack = localStream.getVideoTracks()[0];
+    Object.values(peerConnections).forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender && camTrack) sender.replaceTrack(camTrack);
+    });
+
+    const localVideo = document.querySelector('#tile-local video');
+    if (localVideo) localVideo.srcObject = localStream;
+    screenStream?.getTracks().forEach(t => t.stop());
+    screenStream = null;
+    screenOn = false;
+    if (activePresentationFrom === socket?.id) {
+      activePresentationMode = null;
+      activePresentationFrom = null;
+      socket?.emit('presentation-stop', { roomId: myRoom });
+    }
+    const btn = document.getElementById('btn-screen');
+    btn.classList.remove('on');
+    btn.dataset.tooltip = 'Present now';
+    document.getElementById('icon-screen').textContent = 'present_to_all';
+    showToast('Screen sharing stopped');
+    applyPresentationLayout();
+  }
+}
+
+
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  const btn = document.getElementById('btn-chat');
+  const badge = document.getElementById('chat-badge');
+  const isOpen = panel.classList.toggle('open');
+  btn.classList.toggle('on', isOpen);
+  btn.dataset.tooltip = isOpen ? 'Close chat' : 'Chat with everyone';
+  if (isOpen) badge.classList.remove('visible');
+  if (isOpen) {
+    document.getElementById('whiteboard-panel').classList.remove('open');
+    document.getElementById('whiteboard-panel').classList.remove('fullscreen');
+    applyPresentationLayout();
+    const fullBtn = document.getElementById('wb-full-btn');
+    if (fullBtn) fullBtn.textContent = 'Fullscreen';
+    document.getElementById('btn-whiteboard').classList.remove('on');
+  }
+}
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = (input.value || '').trim();
+  if (!text) return;
+  addChatMsg(myName, text, false);
+  socket?.emit('chat-message', { roomId: myRoom, name: myName, text });
+  input.value = '';
+}
+function toggleHand() {
+  handRaised = !handRaised;
+  const btn = document.getElementById('btn-hand');
+  btn.classList.toggle('on', handRaised);
+  btn.dataset.tooltip = handRaised ? 'Lower your hand' : 'Raise your hand';
+  showToast(handRaised ? 'Hand raised' : 'Hand lowered');
+}
+
+function leaveMeeting() {
+  // Close all WebRTC peer connections
+  Object.keys(peerConnections).forEach(id => closePeerConnection(id));
+  Object.keys(peers).forEach(id => delete peers[id]);
+  if (activePresentationFrom === socket?.id && activePresentationMode) {
+    socket?.emit('presentation-stop', { roomId: myRoom });
+  }
+  stopAutoRecording();
+  localStream?.getTracks().forEach(t => t.stop());
+  screenStream?.getTracks().forEach(t => t.stop());
+  socket?.disconnect();
+  document.getElementById('page-meeting').classList.remove('active');
+  document.getElementById('meet-controls').classList.remove('active');
+  document.getElementById('chat-panel').classList.remove('open');
+  document.getElementById('whiteboard-panel').classList.remove('open');
+  document.getElementById('whiteboard-panel').classList.remove('fullscreen');
+  document.getElementById('page-meeting').classList.remove('presentation-active');
+  document.getElementById('btn-chat').classList.remove('on');
+  document.getElementById('btn-whiteboard').classList.remove('on');
+  const fullBtn = document.getElementById('wb-full-btn');
+  if (fullBtn) fullBtn.textContent = 'Fullscreen';
+  document.getElementById('page-home').style.display = 'flex';
+  document.getElementById('video-grid').innerHTML = '';
+  document.getElementById('chat-messages').innerHTML = '';
+  clearWhiteboardLocal();
+  roomRecorderSocketId = null;
+  isRoomRecorder = false;
+  autoRecordPromptAttempted = false;
+  displayStream?.getTracks().forEach((t) => t.stop());
+  displayStream = null;
+  const recBtn = document.getElementById('btn-record');
+  if (recBtn) recBtn.style.display = 'none';
+  const stageVideo = document.getElementById('screen-stage-video');
+  if (stageVideo) stageVideo.srcObject = null;
+  document.getElementById('screen-stage').classList.remove('open');
+  history.pushState({}, '', window.location.pathname);
+  showToast('You left the meeting');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('page-meeting').classList.contains('active')) return;
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'm' || e.key === 'M') toggleMic();
+  if (e.key === 'v' || e.key === 'V') toggleCam();
+});
+
+// Auto-join from URL
+window.addEventListener('DOMContentLoaded', () => {
+  const room = new URLSearchParams(window.location.search).get('room');
+  if (room) document.getElementById('room-join').value = room;
+});
+</script>
+</body>
+</html>
