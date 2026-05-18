@@ -843,6 +843,83 @@
     }
     .lobby-back:hover { color: #e8eaed; }
 
+    .perm-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #121b12;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .perm-card label {
+      font-size: 0.78rem;
+      color: #c9d4c9;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 500;
+    }
+    .perm-card select {
+      width: 100%;
+      background: #0f160f;
+      color: #e8f0e8;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+
+    #perm-modal {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(0,0,0,0.55);
+      display: none; align-items: center; justify-content: center;
+      padding: 14px;
+    }
+    #perm-modal.open { display: flex; }
+    .perm-dialog {
+      width: min(520px, 100%);
+      max-height: 85vh;
+      overflow: auto;
+      background: #111a11;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 16px 46px rgba(0,0,0,0.5);
+      padding: 14px;
+    }
+    .perm-group {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #0d140d;
+    }
+    .perm-group h4 {
+      font-size: 0.84rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .perm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .perm-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #d8e3d8;
+    }
+    .perm-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
     @media (max-width: 640px) {
       .lobby-wrap { flex-direction: column; gap: 20px; }
       .lobby-panel { width: 100%; }
@@ -938,6 +1015,21 @@
           <strong>This room already has 4 or more people.</strong>
           <p>Calls may become unstable beyond 4 -- video and audio quality can drop. You can still join.</p>
         </div>
+      </div>
+
+      <div class="perm-card">
+        <label for="pre-whiteboard-mode">Whiteboard access</label>
+        <select id="pre-whiteboard-mode">
+          <option value="host">Host only</option>
+          <option value="all" selected>All users</option>
+          <option value="selected">Host + selected participants</option>
+        </select>
+        <label for="pre-recording-mode">Recording access</label>
+        <select id="pre-recording-mode">
+          <option value="host" selected>Host only</option>
+          <option value="all">All users</option>
+          <option value="selected">Host + selected participants</option>
+        </select>
       </div>
 
       <button class="lobby-join-btn" onclick="lobbyJoin()">Join now</button>
@@ -1072,6 +1164,14 @@
       <span class="material-symbols-rounded">draw</span>
     </button>
 
+    <button class="ctrl-btn" id="btn-perms" onclick="openPermissionsModal()" data-tooltip="Permissions">
+      <span class="material-symbols-rounded">admin_panel_settings</span>
+    </button>
+
+    <button class="ctrl-btn" onclick="inviteOnWhatsApp()" data-tooltip="Invite on WhatsApp">
+      <span class="material-symbols-rounded">share</span>
+    </button>
+
     <!-- Copy invite link -->
     <button class="ctrl-btn" onclick="copyLink()" data-tooltip="Copy invite link">
       <span class="material-symbols-rounded">link</span>
@@ -1087,6 +1187,38 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="perm-modal">
+  <div class="perm-dialog">
+    <div class="chat-header" style="padding:0 0 10px 0;border-bottom:1px solid var(--border);">
+      Meeting permissions
+      <span class="chat-close" onclick="closePermissionsModal()">
+        <span class="material-symbols-rounded">close</span>
+      </span>
+    </div>
+    <div class="perm-group">
+      <h4>Whiteboard</h4>
+      <select id="perm-whiteboard-mode">
+        <option value="host">Host only</option>
+        <option value="all">All users</option>
+        <option value="selected">Host + selected participants</option>
+      </select>
+      <div class="perm-list" id="perm-whiteboard-list"></div>
+    </div>
+    <div class="perm-group">
+      <h4>Recording</h4>
+      <select id="perm-recording-mode">
+        <option value="host">Host only</option>
+        <option value="all">All users</option>
+        <option value="selected">Host + selected participants</option>
+      </select>
+      <div class="perm-list" id="perm-recording-list"></div>
+    </div>
+    <div class="perm-actions">
+      <button class="wb-btn" onclick="closePermissionsModal()">Cancel</button>
+      <button class="wb-btn" onclick="savePermissionsModal()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ════════════════════════════════════════
@@ -1101,6 +1233,17 @@ let recordingSessionId = null;
 let recordingUploadChain = Promise.resolve();
 let roomRecorderSocketId = null;
 let isRoomRecorder = false;
+let roomHostSocketId = null;
+let isRoomHost = false;
+let roomParticipants = [];
+let pendingLobbyPermissions = {
+  whiteboard: { mode: 'all', selected: [] },
+  recording: { mode: 'host', selected: [] }
+};
+let roomPermissions = {
+  whiteboard: { mode: 'all', selected: [] },
+  recording: { mode: 'host', selected: [] }
+};
 let displayStream = null;
 let autoRecordPromptAttempted = false;
 let activePresentationMode = null;
@@ -1173,12 +1316,110 @@ function updatePeerCount() {
   // peer count badge removed from top bar
 }
 
+function applyPermissionUi() {
+  const wbBtn = document.getElementById('btn-whiteboard');
+  const recBtn = document.getElementById('btn-record');
+  const permsBtn = document.getElementById('btn-perms');
+  const canWhiteboard = canUseFeature('whiteboard');
+  const canRecord = canUseFeature('recording');
+  if (wbBtn) {
+    wbBtn.style.display = canWhiteboard ? 'flex' : 'none';
+  }
+  if (recBtn) {
+    recBtn.style.display = canRecord ? 'flex' : 'none';
+  }
+  if (permsBtn) {
+    permsBtn.style.display = isRoomHost ? 'flex' : 'none';
+  }
+}
+
+function canUseFeature(feature) {
+  const cfg = roomPermissions?.[feature];
+  if (!cfg) return true;
+  if (cfg.mode === 'all') return true;
+  if (cfg.mode === 'host') return isRoomHost;
+  if (cfg.mode === 'selected') {
+    return isRoomHost || (cfg.selected || []).includes(socket?.id);
+  }
+  return false;
+}
+
+function inviteOnWhatsApp() {
+  const room = myRoom || document.getElementById('room-join')?.value?.trim() || '';
+  if (!room) {
+    showToast('No active room yet');
+    return;
+  }
+  const link = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room)}`;
+  const message = `Join my Xolox Meet call\nRoom: ${room}\n${link}`;
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(waUrl, '_blank', 'noopener,noreferrer');
+}
+
+function openPermissionsModal() {
+  if (!isRoomHost) {
+    showToast('Only host can change permissions');
+    return;
+  }
+  document.getElementById('perm-whiteboard-mode').value = roomPermissions.whiteboard.mode || 'all';
+  document.getElementById('perm-recording-mode').value = roomPermissions.recording.mode || 'host';
+  renderPermissionParticipantList('whiteboard');
+  renderPermissionParticipantList('recording');
+  document.getElementById('perm-modal')?.classList.add('open');
+}
+
+function closePermissionsModal() {
+  document.getElementById('perm-modal')?.classList.remove('open');
+}
+
+function renderPermissionParticipantList(feature) {
+  const listEl = document.getElementById(`perm-${feature}-list`);
+  const modeEl = document.getElementById(`perm-${feature}-mode`);
+  if (!listEl || !modeEl) return;
+  const selectedSet = new Set(roomPermissions?.[feature]?.selected || []);
+  listEl.innerHTML = '';
+  const selectable = roomParticipants.filter((p) => p.peerId !== socket?.id);
+  if (modeEl.value !== 'selected') {
+    listEl.style.display = 'none';
+    return;
+  }
+  listEl.style.display = 'flex';
+  if (selectable.length === 0) {
+    listEl.innerHTML = `<div class="chat-msg system">No other participants right now</div>`;
+    return;
+  }
+  selectable.forEach((p) => {
+    const row = document.createElement('label');
+    row.className = 'perm-item';
+    row.innerHTML = `<input type="checkbox" value="${p.peerId}" ${selectedSet.has(p.peerId) ? 'checked' : ''}/> ${p.userName}`;
+    listEl.appendChild(row);
+  });
+}
+
+function readSelectedParticipantIds(feature) {
+  const listEl = document.getElementById(`perm-${feature}-list`);
+  if (!listEl) return [];
+  return [...listEl.querySelectorAll('input[type="checkbox"]:checked')].map((n) => n.value);
+}
+
+function savePermissionsModal() {
+  if (!isRoomHost) return;
+  const wbMode = document.getElementById('perm-whiteboard-mode').value;
+  const recMode = document.getElementById('perm-recording-mode').value;
+  const wbSelected = wbMode === 'selected' ? readSelectedParticipantIds('whiteboard') : [];
+  const recSelected = recMode === 'selected' ? readSelectedParticipantIds('recording') : [];
+  socket?.emit('permissions-update', { roomId: myRoom, feature: 'whiteboard', mode: wbMode, selected: wbSelected });
+  socket?.emit('permissions-update', { roomId: myRoom, feature: 'recording', mode: recMode, selected: recSelected });
+  closePermissionsModal();
+}
+
 // ════════════════════════════════════════
 // HOME ACTIONS
 // ════════════════════════════════════════
 function startNew() {
   const name = document.getElementById('name-new').value.trim() || 'Guest';
   const room = generateRoomId();
+  pendingIsHostIntent = true;
   goToLobby(room, name);
 }
 
@@ -1186,6 +1427,7 @@ function joinRoom() {
   let room = document.getElementById('room-join').value.trim();
   const name = document.getElementById('name-join').value.trim() || 'Guest';
   if (!room) { showToast('Enter a meeting ID'); return; }
+  pendingIsHostIntent = false;
   goToLobby(room, name);
 }
 
@@ -1196,6 +1438,7 @@ let lobbyStream = null;
 let micAnalyser = null, micAnimFrame = null;
 let lobbyMicOn = true, lobbyCamOn = true;
 let pendingRoom = '', pendingName = '';
+let pendingIsHostIntent = false;
 let lobbyAtCap = false;
 let lobbyCapConfirmed = false;
 
@@ -1207,6 +1450,8 @@ async function goToLobby(roomId, name) {
   document.getElementById('page-lobby').classList.add('active');
   document.getElementById('lobby-room-display').textContent = roomId;
   document.getElementById('lobby-avatar').textContent = (name || 'G')[0].toUpperCase();
+  const permCard = document.querySelector('.perm-card');
+  if (permCard) permCard.style.display = pendingIsHostIntent ? 'flex' : 'none';
 
   history.pushState({}, '', `?room=${roomId}`);
 
@@ -1419,6 +1664,13 @@ function lobbyJoin() {
     return;
   }
   if (micAnimFrame) { cancelAnimationFrame(micAnimFrame); micAnimFrame = null; }
+  if (pendingIsHostIntent) {
+    pendingLobbyPermissions.whiteboard.mode = document.getElementById('pre-whiteboard-mode')?.value || 'all';
+    pendingLobbyPermissions.recording.mode = document.getElementById('pre-recording-mode')?.value || 'host';
+  } else {
+    pendingLobbyPermissions.whiteboard.mode = 'all';
+    pendingLobbyPermissions.recording.mode = 'host';
+  }
   document.getElementById('lobby-video').srcObject = null;
   document.getElementById('page-lobby').classList.remove('active');
   enterMeeting(pendingRoom, pendingName, lobbyStream, lobbyMicOn, lobbyCamOn);
@@ -1481,7 +1733,7 @@ async function enterMeeting(roomId, name, stream, micEnabled, camEnabled) {
 
   socket = io();
   setupSocketEvents();
-  socket.emit('join-room', { roomId, userName: name });
+  socket.emit('join-room', { roomId, userName: name, initialPermissions: pendingLobbyPermissions });
   applyPresentationLayout();
   // WebRTC peer connections get created in the existing-peers/peer-joined handlers
 }
@@ -1706,6 +1958,13 @@ function clearWhiteboardLocal() {
 
 function toggleWhiteboard(forceOpen) {
   const panel = document.getElementById('whiteboard-panel');
+  const isCurrentlyOpen = panel?.classList.contains('open');
+  const closing = forceOpen === false || (forceOpen === undefined && isCurrentlyOpen);
+  if (!closing && !canUseFeature('whiteboard')) {
+    showToast('Whiteboard access is restricted by host');
+    return;
+  }
+  
   const btn = document.getElementById('btn-whiteboard');
   const meeting = document.getElementById('page-meeting');
   if (!panel || !btn) return;
@@ -1762,19 +2021,23 @@ function applyPresentationLayout() {
 }
 
 function clearWhiteboard() {
+  if (!canUseFeature('whiteboard')) {
+    showToast('Whiteboard access is restricted by host');
+    return;
+  }
   const frame = document.getElementById('whiteboard-frame');
   frame?.contentWindow?.postMessage({ type: 'WB_CLEAR' }, '*');
 }
 
 window.addEventListener('message', (event) => {
   const data = event.data || {};
-  if (data.type === 'WB_STATE_UPDATE' && data.dataUrl && socket && myRoom) {
+  if (data.type === 'WB_STATE_UPDATE' && data.dataUrl && socket && myRoom && canUseFeature('whiteboard')) {
     socket.emit('whiteboard-state', { roomId: myRoom, dataUrl: data.dataUrl });
   }
 });
 
 async function startAutoRecording() {
-  if (isRecording || !isRoomRecorder) return;
+  if (isRecording || !canUseFeature('recording')) return;
   if (typeof MediaRecorder === 'undefined') {
     showToast('Recording not supported in this browser');
     return;
@@ -1880,8 +2143,8 @@ function stopAutoRecording() {
 }
 
 function toggleRecording() {
-  if (!isRoomRecorder) {
-    showToast('Only the designated room recorder can record');
+  if (!canUseFeature('recording')) {
+    showToast('Recording access is restricted by host');
     return;
   }
   if (isRecording) {
@@ -2221,20 +2484,26 @@ function setupSocketEvents() {
   socket.on('room-recorder', ({ recorderSocketId }) => {
     roomRecorderSocketId = recorderSocketId || null;
     isRoomRecorder = socket?.id && roomRecorderSocketId === socket.id;
-    const btn = document.getElementById('btn-record');
-    if (!btn) return;
-    if (isRoomRecorder) {
-      btn.style.display = 'flex';
-      btn.dataset.tooltip = isRecording ? 'Stop recording' : 'Start recording';
-      showToast('You are the meeting recorder');
-      if (!autoRecordPromptAttempted && !isRecording) {
-        autoRecordPromptAttempted = true;
-        startAutoRecording().catch(() => {});
-      }
-    } else {
-      if (isRecording) stopAutoRecording();
-      btn.style.display = 'none';
+    applyPermissionUi();
+  });
+
+  socket.on('room-host', ({ hostSocketId }) => {
+    roomHostSocketId = hostSocketId || null;
+    isRoomHost = !!socket?.id && roomHostSocketId === socket.id;
+    applyPermissionUi();
+  });
+
+  socket.on('room-participants', ({ participants }) => {
+    roomParticipants = Array.isArray(participants) ? participants : [];
+    if (document.getElementById('perm-modal')?.classList.contains('open')) {
+      renderPermissionParticipantList('whiteboard');
+      renderPermissionParticipantList('recording');
     }
+  });
+
+  socket.on('room-permissions', (perms) => {
+    roomPermissions = perms || roomPermissions;
+    applyPermissionUi();
   });
 
   socket.on('whiteboard-sync', () => {});
@@ -2452,6 +2721,13 @@ function leaveMeeting() {
   clearWhiteboardLocal();
   roomRecorderSocketId = null;
   isRoomRecorder = false;
+  roomHostSocketId = null;
+  isRoomHost = false;
+  roomParticipants = [];
+  roomPermissions = {
+    whiteboard: { mode: 'all', selected: [] },
+    recording: { mode: 'host', selected: [] }
+  };
   autoRecordPromptAttempted = false;
   displayStream?.getTracks().forEach((t) => t.stop());
   displayStream = null;
@@ -2476,6 +2752,8 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('DOMContentLoaded', () => {
   const room = new URLSearchParams(window.location.search).get('room');
   if (room) document.getElementById('room-join').value = room;
+  document.getElementById('perm-whiteboard-mode')?.addEventListener('change', () => renderPermissionParticipantList('whiteboard'));
+  document.getElementById('perm-recording-mode')?.addEventListener('change', () => renderPermissionParticipantList('recording'));
 });
 </script>
 </body>

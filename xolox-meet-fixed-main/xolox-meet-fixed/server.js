@@ -59,6 +59,54 @@ const whiteboardEvents = {};
 const recordingSessions = new Map();
 const roomRecorders = {};
 const roomPresentationState = {};
+const roomHosts = {};
+const roomPermissions = {};
+
+function normalizePermissionMode(mode) {
+  return ['host', 'all', 'selected'].includes(mode) ? mode : 'host';
+}
+
+function ensureRoomPermissions(roomId) {
+  if (!roomPermissions[roomId]) {
+    roomPermissions[roomId] = {
+      whiteboard: { mode: 'all', selected: new Set() },
+      recording: { mode: 'host', selected: new Set() }
+    };
+  }
+  return roomPermissions[roomId];
+}
+
+function serializeRoomPermissions(roomId) {
+  const p = ensureRoomPermissions(roomId);
+  return {
+    whiteboard: { mode: p.whiteboard.mode, selected: [...p.whiteboard.selected] },
+    recording: { mode: p.recording.mode, selected: [...p.recording.selected] }
+  };
+}
+
+function isFeatureAllowed(roomId, feature, socketId) {
+  const hostId = roomHosts[roomId];
+  if (!hostId) return true;
+  const p = ensureRoomPermissions(roomId)[feature];
+  if (!p) return false;
+  if (p.mode === 'all') return true;
+  if (p.mode === 'host') return socketId === hostId;
+  if (p.mode === 'selected') return socketId === hostId || p.selected.has(socketId);
+  return false;
+}
+
+function getRoomParticipants(roomId) {
+  return [...(rooms[roomId] || [])].map((id) => ({
+    peerId: id,
+    userName: io.sockets.sockets.get(id)?.data.userName || 'Guest'
+  }));
+}
+
+function emitRoomState(roomId) {
+  io.to(roomId).emit('room-host', { hostSocketId: roomHosts[roomId] || null });
+  io.to(roomId).emit('room-permissions', serializeRoomPermissions(roomId));
+  io.to(roomId).emit('room-participants', { participants: getRoomParticipants(roomId) });
+}
 
 function writeRecordingMeta(filePath, patch) {
   const metaPath = `${filePath}.json`;
@@ -248,8 +296,8 @@ app.post('/api/recordings/start', (req, res) => {
   const roomId = String(req.body?.roomId || 'room').replace(/[^a-zA-Z0-9_-]/g, '-');
   const userName = String(req.body?.userName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '-');
   const recorderSocketId = String(req.body?.recorderSocketId || '');
-  if (roomRecorders[roomId] && recorderSocketId && roomRecorders[roomId] !== recorderSocketId) {
-    return res.status(403).json({ error: 'Only room recorder can start mixed recording' });
+  if (!recorderSocketId || !isFeatureAllowed(roomId, 'recording', recorderSocketId)) {
+    return res.status(403).json({ error: 'Recording permission denied' });
   }
   const sessionId = crypto.randomUUID();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -338,7 +386,7 @@ app.get('/api/recordings', (_req, res) => {
 io.on('connection', (socket) => {
   console.log('connected:', socket.id);
 
-  socket.on('join-room', ({ roomId, userName }) => {
+  socket.on('join-room', ({ roomId, userName, initialPermissions }) => {
     socket.data.userName = userName;
     socket.data.roomId = roomId;
 
@@ -357,6 +405,17 @@ io.on('connection', (socket) => {
 
     rooms[roomId].add(socket.id);
     socket.join(roomId);
+    if (!roomHosts[roomId]) {
+      roomHosts[roomId] = socket.id;
+      const p = ensureRoomPermissions(roomId);
+      const initial = initialPermissions || {};
+      if (initial.whiteboard?.mode) p.whiteboard.mode = normalizePermissionMode(initial.whiteboard.mode);
+      if (initial.recording?.mode) p.recording.mode = normalizePermissionMode(initial.recording.mode);
+      p.whiteboard.selected.clear();
+      p.recording.selected.clear();
+    } else {
+      ensureRoomPermissions(roomId);
+    }
     if (!roomRecorders[roomId]) roomRecorders[roomId] = socket.id;
     io.to(roomId).emit('room-recorder', { recorderSocketId: roomRecorders[roomId] });
     if (!whiteboardEvents[roomId]) whiteboardEvents[roomId] = [];
@@ -364,7 +423,22 @@ io.on('connection', (socket) => {
     if (roomPresentationState[roomId]) {
       socket.emit('presentation-start', roomPresentationState[roomId]);
     }
+    emitRoomState(roomId);
     console.log(`${userName} joined ${roomId} (${rooms[roomId].size} users)`);
+  });
+
+  socket.on('permissions-update', ({ roomId, feature, mode, selected }) => {
+    if (!roomId || !feature || !['whiteboard', 'recording'].includes(feature)) return;
+    if (roomHosts[roomId] !== socket.id) return;
+    const p = ensureRoomPermissions(roomId);
+    const target = p[feature];
+    target.mode = normalizePermissionMode(mode);
+    target.selected.clear();
+    const roomSet = rooms[roomId] || new Set();
+    for (const id of (Array.isArray(selected) ? selected : [])) {
+      if (roomSet.has(id) && id !== roomHosts[roomId]) target.selected.add(id);
+    }
+    io.to(roomId).emit('room-permissions', serializeRoomPermissions(roomId));
   });
 
   socket.on('offer', ({ to, offer }) => io.to(to).emit('offer', { from: socket.id, offer }));
@@ -391,6 +465,7 @@ io.on('connection', (socket) => {
 
   socket.on('whiteboard-draw', ({ roomId, segment }) => {
     if (!roomId || !segment) return;
+    if (!isFeatureAllowed(roomId, 'whiteboard', socket.id)) return;
     if (!whiteboardEvents[roomId]) whiteboardEvents[roomId] = [];
     whiteboardEvents[roomId].push(segment);
     if (whiteboardEvents[roomId].length > 5000) {
@@ -401,12 +476,14 @@ io.on('connection', (socket) => {
 
   socket.on('whiteboard-clear', ({ roomId }) => {
     if (!roomId) return;
+    if (!isFeatureAllowed(roomId, 'whiteboard', socket.id)) return;
     whiteboardEvents[roomId] = [];
     io.to(roomId).emit('whiteboard-clear');
   });
 
   socket.on('whiteboard-state', ({ roomId, dataUrl }) => {
     if (!roomId || !dataUrl) return;
+    if (!isFeatureAllowed(roomId, 'whiteboard', socket.id)) return;
     socket.to(roomId).emit('whiteboard-state', { from: socket.id, dataUrl });
   });
 
@@ -433,8 +510,13 @@ io.on('connection', (socket) => {
         delete whiteboardEvents[roomId];
         delete roomRecorders[roomId];
         delete roomPresentationState[roomId];
+        delete roomHosts[roomId];
+        delete roomPermissions[roomId];
       }
       else {
+        if (roomHosts[roomId] === socket.id) {
+          roomHosts[roomId] = [...rooms[roomId]][0];
+        }
         if (roomPresentationState[roomId]?.from === socket.id) {
           delete roomPresentationState[roomId];
           io.to(roomId).emit('presentation-stop', { from: socket.id });
@@ -444,6 +526,7 @@ io.on('connection', (socket) => {
           io.to(roomId).emit('room-recorder', { recorderSocketId: roomRecorders[roomId] });
         }
         io.to(roomId).emit('peer-left', { peerId: socket.id, userName });
+        emitRoomState(roomId);
       }
     }
     console.log('disconnected:', socket.id);
