@@ -110,6 +110,56 @@ function runCmd(cmd, args) {
   });
 }
 
+function cleanupTranscriptLine(text) {
+  if (!text) return '';
+  const compact = String(text).replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  return compact.replace(/\b(\w+)(\s+\1\b)+/gi, '$1');
+}
+
+function normalizeTranscriptFile(txtPath) {
+  if (!fs.existsSync(txtPath)) return;
+  const raw = fs.readFileSync(txtPath, 'utf8');
+  const lines = raw
+    .split(/\r?\n/)
+    .map(cleanupTranscriptLine)
+    .filter(Boolean);
+  const normalized = lines.join('\n').trim();
+  fs.writeFileSync(txtPath, normalized ? `${normalized}\n` : '', 'utf8');
+}
+
+async function transcribeWithGroq(wavPath, txtPath) {
+  const apiKey = process.env.GROQ_API_KEY || '';
+  if (!apiKey) return false;
+
+  const model = process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3-turbo';
+  const language = process.env.GROQ_TRANSCRIBE_LANGUAGE || '';
+  const audioBytes = fs.readFileSync(wavPath);
+  const form = new FormData();
+  form.append('model', model);
+  form.append('response_format', 'text');
+  form.append('temperature', '0');
+  if (language) form.append('language', language);
+  form.append('file', new Blob([audioBytes], { type: 'audio/wav' }), path.basename(wavPath));
+
+  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form
+  });
+
+  if (!response.ok) {
+    const err = await response.text().catch(() => '');
+    throw new Error(`Groq STT failed (${response.status}) ${err.slice(0, 300)}`);
+  }
+
+  const bodyText = await response.text();
+  const transcriptText = bodyText.trim();
+  if (!transcriptText) throw new Error('Groq STT returned empty transcript');
+  fs.writeFileSync(txtPath, `${transcriptText}\n`, 'utf8');
+  return true;
+}
+
 async function transcribeRecording(filePath) {
   const baseName = path.basename(filePath, path.extname(filePath));
   const wavPath = path.join(TRANSCRIPTS_DIR, `${baseName}.wav`);
@@ -118,31 +168,63 @@ async function transcribeRecording(filePath) {
 
   const ffmpegBin = findFfmpegPath();
   try {
-    await runCmd(ffmpegBin, ['-y', '-i', filePath, '-ac', '1', '-ar', '16000', wavPath]);
+    await runCmd(ffmpegBin, [
+      '-y',
+      '-i',
+      filePath,
+      '-vn',
+      '-af',
+      'highpass=f=120,lowpass=f=7600,dynaudnorm',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      wavPath
+    ]);
   } catch (e) {
     writeRecordingMeta(filePath, { transcriptStatus: 'failed', transcriptError: `ffmpeg unavailable: ${e.message}` });
     return;
   }
 
   let transcribed = false;
+  let transcriptEngine = 'none';
   try {
+    transcribed = await transcribeWithGroq(wavPath, txtPath);
+    if (transcribed) transcriptEngine = 'groq';
+  } catch (e) {
+    writeRecordingMeta(filePath, { transcriptWarning: e.message });
+  }
+
+  try {
+    if (transcribed) throw new Error('skip-local-whisper');
+    const whisperModel = process.env.WHISPER_MODEL || 'small';
     const script = `
 from faster_whisper import WhisperModel
-model = WhisperModel("base", device="cpu", compute_type="int8")
-segments, _ = model.transcribe(r"""${wavPath.replace(/\\/g, '\\\\')}""")
+model = WhisperModel("${whisperModel}", device="cpu", compute_type="int8")
+segments, _ = model.transcribe(
+  r"""${wavPath.replace(/\\/g, '\\\\')}""",
+  vad_filter=True,
+  beam_size=5,
+  best_of=5,
+  temperature=0
+)
 out = r"""${txtPath.replace(/\\/g, '\\\\')}"""
 with open(out, "w", encoding="utf-8") as f:
     for s in segments:
-        f.write(s.text.strip() + "\\n")
+        t = s.text.strip()
+        if t:
+            f.write(t + "\\n")
 `;
     await runCmd('python', ['-c', script]);
     transcribed = true;
+    transcriptEngine = 'faster-whisper';
   } catch (_) {}
 
   if (!transcribed) {
     try {
-      await runCmd('python', ['-m', 'whisper', wavPath, '--model', 'base', '--output_format', 'txt', '--output_dir', TRANSCRIPTS_DIR]);
+      await runCmd('python', ['-m', 'whisper', wavPath, '--model', process.env.WHISPER_MODEL || 'small', '--output_format', 'txt', '--output_dir', TRANSCRIPTS_DIR, '--fp16', 'False', '--temperature', '0']);
       transcribed = true;
+      transcriptEngine = 'whisper-cli';
     } catch (e) {
       writeRecordingMeta(filePath, { transcriptStatus: 'failed', transcriptError: `whisper unavailable: ${e.message}` });
       return;
@@ -150,7 +232,8 @@ with open(out, "w", encoding="utf-8") as f:
   }
 
   if (fs.existsSync(txtPath)) {
-    writeRecordingMeta(filePath, { transcriptStatus: 'ready', transcriptPath: txtPath });
+    normalizeTranscriptFile(txtPath);
+    writeRecordingMeta(filePath, { transcriptStatus: 'ready', transcriptPath: txtPath, transcriptEngine });
   } else {
     writeRecordingMeta(filePath, { transcriptStatus: 'failed', transcriptError: 'Transcript file was not produced' });
   }
@@ -290,6 +373,20 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', ({ roomId, name, text }) => {
     io.to(roomId).emit('chat-message', { name, text });
+  });
+
+  socket.on('chat-file', ({ roomId, name, file }) => {
+    if (!roomId || !file || !file.dataUrl || !file.name) return;
+    io.to(roomId).emit('chat-file', {
+      senderId: socket.id,
+      name,
+      file: {
+        name: String(file.name).slice(0, 120),
+        type: String(file.type || ''),
+        size: Number(file.size || 0),
+        dataUrl: String(file.dataUrl)
+      }
+    });
   });
 
   socket.on('whiteboard-draw', ({ roomId, segment }) => {

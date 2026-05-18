@@ -223,6 +223,12 @@
       border-radius: 12px; overflow: hidden;
       border: 1px solid var(--border);
       aspect-ratio: 16/9;
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .video-tile:hover {
+      border-color: rgba(34,197,94,0.45);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+      transform: translateY(-2px);
     }
 
     .video-tile video {
@@ -288,9 +294,12 @@
       width: 300px; background: var(--surface);
       border-left: 1px solid var(--border);
       display: none; flex-direction: column; z-index: 10;
+      transform: translateX(8px);
+      opacity: 0;
+      transition: transform 0.22s ease, opacity 0.22s ease;
     }
 
-    #chat-panel.open { display: flex; }
+    #chat-panel.open { display: flex; transform: translateX(0); opacity: 1; }
 
     #meeting-content {
       position: relative;
@@ -301,24 +310,19 @@
 
     #whiteboard-panel {
       position: absolute;
-      inset: 8px;
+      inset: 16px 18px 92px 18px;
       background: #0d140d;
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 16px;
       box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
       display: none; flex-direction: column; z-index: 12;
       overflow: hidden;
+      transform: translateY(8px);
+      opacity: 0;
+      transition: transform 0.24s ease, opacity 0.24s ease;
     }
 
-    #whiteboard-panel.open { display: flex; }
-
-    #whiteboard-panel.fullscreen {
-      inset: 0;
-      border-radius: 0;
-      border-left: 0;
-      border-right: 0;
-      border-top: 0;
-    }
+    #whiteboard-panel.open { display: flex; transform: translateY(0); opacity: 1; }
 
     .wb-header {
       padding: 12px 14px; border-bottom: 1px solid var(--border);
@@ -356,7 +360,7 @@
     }
 
     #page-meeting.presentation-active #video-grid {
-      flex: 0 0 280px;
+      flex: 0 0 min(34vw, 380px);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -383,6 +387,7 @@
       border-radius: 12px;
       box-shadow: none;
       z-index: 12;
+      margin: 8px 10px calc(var(--meet-bar-height) + 8px) 0;
     }
 
     #page-meeting.presentation-active #screen-stage.open {
@@ -432,6 +437,20 @@
     .chat-msg .sender { font-weight: 600; color: var(--accent); margin-bottom: 2px; font-size: 0.78rem; }
     .chat-msg .text { color: rgba(255,255,255,0.85); }
     .chat-msg.system { text-align: center; color: var(--muted); font-size: 0.78rem; font-style: italic; }
+    .chat-msg .file-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #8cc8ff; text-decoration: none; margin-top: 4px;
+      font-size: 0.8rem; word-break: break-all;
+    }
+    .chat-msg .file-link:hover { text-decoration: underline; }
+    .chat-msg .file-preview {
+      margin-top: 8px; max-width: 100%;
+      border-radius: 10px; border: 1px solid var(--border);
+      overflow: hidden; background: #0b120b;
+    }
+    .chat-msg .file-preview img {
+      width: 100%; max-height: 180px; object-fit: cover; display: block;
+    }
 
     .chat-input-row {
       display: flex; gap: 6px; padding: 10px;
@@ -450,6 +469,14 @@
       flex-shrink: 0;
     }
     .chat-send .material-symbols-rounded { font-size: 18px; }
+    .chat-file {
+      width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+      background: #172317; color: #d4dfd4; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    }
+    .chat-file:hover { background: #223422; border-color: rgba(34,197,94,0.5); }
+    .chat-file:active { transform: scale(0.96); }
 
     /* Toast */
     .toast {
@@ -628,14 +655,40 @@
     }
     .chat-badge.visible { display: block; }
 
+    @media (max-width: 900px) {
+      #video-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      #chat-panel { width: min(90vw, 330px); top: 52px; bottom: calc(var(--meet-bar-height) + 8px); }
+      .meeting-bar { padding: 8px 10px; }
+      #ice-debug-panel { max-width: 62vw; font-size: 0.67rem; }
+      #page-meeting.presentation-active #video-grid { flex: 0 0 34vw; min-width: 160px; }
+    }
+
+    @media (max-width: 640px) {
+      .meeting-bar { height: 46px; }
+      #whiteboard-panel { inset: 8px 8px calc(var(--meet-bar-height) + 6px) 8px; border-radius: 12px; }
+      #page-meeting.presentation-active #video-grid {
+        flex: 0 0 42vw;
+        padding: 6px;
+        gap: 6px;
+      }
+      .wb-header { padding: 10px 10px; font-size: 0.8rem; }
+      #chat-panel { width: 100vw; left: 0; right: 0; top: 46px; bottom: calc(var(--meet-bar-height) + 4px); border-left: 0; border-top: 1px solid var(--border); }
+      .ctrl-right .ctrl-btn:nth-child(1),
+      .ctrl-right .ctrl-section-divider { display: none; }
+    }
+
     @media (max-width: 480px) {
       nav { padding: 16px 20px; }
       .cards { grid-template-columns: 1fr; }
       .ctrl-left, .ctrl-right { min-width: 0; }
       .ctrl-left { display: none; }
-      #meet-controls { padding: 0 12px; gap: 6px; }
-      .ctrl-btn { width: 44px; height: 44px; }
-      .ctrl-btn-end { width: 60px; height: 44px; }
+      #meet-controls { padding: 0 8px; gap: 6px; }
+      .ctrl-btn { width: 40px; height: 40px; }
+      .ctrl-btn .material-symbols-rounded { font-size: 20px; }
+      .ctrl-btn-end { width: 54px; height: 40px; }
+      #video-grid { gap: 6px; padding: 6px; padding-bottom: calc(var(--meet-bar-height) + 8px); }
+      .video-tile { border-radius: 10px; }
+      #ice-debug-panel { display: none; }
     }
 
     /* ══════════════════════════════
@@ -917,6 +970,10 @@
       </div>
       <div id="chat-messages"></div>
       <div class="chat-input-row">
+        <input type="file" id="chat-file-input" style="display:none" onchange="sendChatFile(event)"/>
+        <button class="chat-file" onclick="openChatFilePicker()" title="Attach file">
+          <span class="material-symbols-rounded">attach_file</span>
+        </button>
         <input type="text" id="chat-input" placeholder="Send a message…" onkeydown="if(event.key==='Enter')sendChat()"/>
         <button class="chat-send" onclick="sendChat()">
           <span class="material-symbols-rounded">send</span>
@@ -928,7 +985,6 @@
         Shared Whiteboard
         <div style="display:flex;align-items:center;gap:8px">
           <button class="wb-btn" onclick="clearWhiteboard()">Clear</button>
-          <button class="wb-btn" id="wb-full-btn" onclick="toggleWhiteboardFullscreen()">Fullscreen</button>
           <span class="chat-close" onclick="toggleWhiteboard(false)">
             <span class="material-symbols-rounded">close</span>
           </span>
@@ -1487,6 +1543,46 @@ function addChatMsg(sender, text, isSystem) {
   container.scrollTop = container.scrollHeight;
 }
 
+function addChatFileMsg(sender, file, isSystem) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (isSystem ? ' system' : '');
+  if (isSystem) {
+    div.textContent = file?.name ? `${file.name}` : 'File shared';
+  } else {
+    const senderDiv = document.createElement('div');
+    senderDiv.className = 'sender';
+    senderDiv.textContent = sender || 'Guest';
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text';
+    textDiv.textContent = `Shared file: ${file?.name || 'attachment'}`;
+    div.appendChild(senderDiv);
+    div.appendChild(textDiv);
+    if (file?.dataUrl) {
+      const link = document.createElement('a');
+      link.className = 'file-link';
+      link.href = file.dataUrl;
+      link.download = file.name || 'attachment';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = `Download (${Math.max(1, Math.round((file.size || 0) / 1024))} KB)`;
+      div.appendChild(link);
+      if ((file.type || '').startsWith('image/')) {
+        const preview = document.createElement('div');
+        preview.className = 'file-preview';
+        const img = document.createElement('img');
+        img.src = file.dataUrl;
+        img.alt = file.name || 'image';
+        preview.appendChild(img);
+        div.appendChild(preview);
+      }
+    }
+  }
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
 function setupWhiteboardIfNeeded() {
   if (whiteboardReady) return;
   const canvas = document.getElementById('whiteboard-canvas');
@@ -1629,9 +1725,6 @@ function toggleWhiteboard(forceOpen) {
     const frame = document.getElementById('whiteboard-frame');
     frame?.contentWindow?.postMessage({ type: 'WB_SNAPSHOT_REQUEST' }, '*');
   } else {
-    panel.classList.remove('fullscreen');
-    const fullBtn = document.getElementById('wb-full-btn');
-    if (fullBtn) fullBtn.textContent = 'Fullscreen';
     if (activePresentationFrom === socket?.id && activePresentationMode === 'whiteboard') {
       activePresentationMode = null;
       activePresentationFrom = null;
@@ -1639,14 +1732,6 @@ function toggleWhiteboard(forceOpen) {
     }
   }
   applyPresentationLayout();
-}
-
-function toggleWhiteboardFullscreen() {
-  const panel = document.getElementById('whiteboard-panel');
-  const btn = document.getElementById('wb-full-btn');
-  if (!panel || !btn) return;
-  const full = panel.classList.toggle('fullscreen');
-  btn.textContent = full ? 'Exit Full' : 'Fullscreen';
 }
 
 function applyPresentationLayout() {
@@ -2125,6 +2210,14 @@ function setupSocketEvents() {
     }
   });
 
+  socket.on('chat-file', ({ senderId, name, file }) => {
+    if (senderId && senderId === socket?.id) return;
+    addChatFileMsg(name, file, false);
+    if (!document.getElementById('chat-panel').classList.contains('open')) {
+      document.getElementById('chat-badge')?.classList.add('visible');
+    }
+  });
+
   socket.on('room-recorder', ({ recorderSocketId }) => {
     roomRecorderSocketId = recorderSocketId || null;
     isRoomRecorder = socket?.id && roomRecorderSocketId === socket.id;
@@ -2173,7 +2266,6 @@ function setupSocketEvents() {
       const btn = document.getElementById('btn-whiteboard');
       if (panel && btn) {
         panel.classList.remove('open');
-        panel.classList.remove('fullscreen');
         btn.classList.remove('on');
         btn.dataset.tooltip = 'Open whiteboard';
       }
@@ -2283,10 +2375,7 @@ function toggleChat() {
   if (isOpen) badge.classList.remove('visible');
   if (isOpen) {
     document.getElementById('whiteboard-panel').classList.remove('open');
-    document.getElementById('whiteboard-panel').classList.remove('fullscreen');
     applyPresentationLayout();
-    const fullBtn = document.getElementById('wb-full-btn');
-    if (fullBtn) fullBtn.textContent = 'Fullscreen';
     document.getElementById('btn-whiteboard').classList.remove('on');
   }
 }
@@ -2297,6 +2386,36 @@ function sendChat() {
   if (!text) return;
   addChatMsg(myName, text, false);
   socket?.emit('chat-message', { roomId: myRoom, name: myName, text });
+  input.value = '';
+}
+
+function openChatFilePicker() {
+  document.getElementById('chat-file-input')?.click();
+}
+
+function sendChatFile(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if (!file) return;
+  const maxBytes = 8 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('File too large. Max 8 MB.');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const payload = {
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      dataUrl: reader.result
+    };
+    addChatFileMsg(myName, payload, false);
+    socket?.emit('chat-file', { roomId: myRoom, name: myName, file: payload });
+  };
+  reader.onerror = () => showToast('Could not read this file');
+  reader.readAsDataURL(file);
   input.value = '';
 }
 function toggleHand() {
@@ -2324,12 +2443,9 @@ function leaveMeeting() {
   document.getElementById('meet-controls').classList.remove('active');
   document.getElementById('chat-panel').classList.remove('open');
   document.getElementById('whiteboard-panel').classList.remove('open');
-  document.getElementById('whiteboard-panel').classList.remove('fullscreen');
   document.getElementById('page-meeting').classList.remove('presentation-active');
   document.getElementById('btn-chat').classList.remove('on');
   document.getElementById('btn-whiteboard').classList.remove('on');
-  const fullBtn = document.getElementById('wb-full-btn');
-  if (fullBtn) fullBtn.textContent = 'Fullscreen';
   document.getElementById('page-home').style.display = 'flex';
   document.getElementById('video-grid').innerHTML = '';
   document.getElementById('chat-messages').innerHTML = '';

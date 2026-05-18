@@ -32,6 +32,7 @@
     display: flex;
     flex-direction: column;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* TOPBAR */
@@ -80,11 +81,11 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
     white-space: nowrap;
   }
 
-  .top-btn:hover { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.15); }
+  .top-btn:hover { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
   .top-btn:active { transform: scale(0.97); }
   .top-btn.danger:hover { color: #ff6b6b; border-color: rgba(255,107,107,0.3); background: rgba(255,107,107,0.08); }
   .top-btn svg { flex-shrink: 0; }
@@ -177,6 +178,7 @@
     gap: 10px;
     z-index: 20;
     box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.22s ease, opacity 0.22s ease;
   }
 
   /* COLOR SWATCH */
@@ -192,7 +194,7 @@
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid transparent;
-    transition: all 0.12s;
+    transition: all 0.18s ease;
     flex-shrink: 0;
   }
 
@@ -233,7 +235,7 @@
     border-radius: 50%;
     background: var(--text);
     border: 2px solid transparent;
-    transition: all 0.12s;
+    transition: all 0.18s ease;
     flex-shrink: 0;
   }
 
@@ -363,6 +365,33 @@
   .hist-btn:hover { background: var(--surface2); color: var(--text); }
   .hist-btn:disabled { opacity: 0.3; cursor: default; }
   .hist-btn svg { width: 14px; height: 14px; }
+
+  @media (max-width: 820px) {
+    #topbar { height: 46px; padding: 0 10px; gap: 8px; }
+    #topbar .logo { font-size: 13px; }
+    .top-btn { height: 30px; padding: 0 9px; font-size: 12px; }
+    #toolbar { width: 54px; padding: 10px 0; }
+    .tool-btn { width: 40px; height: 40px; }
+    .tool-label { display: none; }
+    #bottom-panel {
+      left: 8px;
+      right: 8px;
+      transform: none;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 8px;
+      border-radius: 10px;
+    }
+    .opacity-row input[type=range] { width: 52px; }
+    #status { right: 10px; top: 8px; }
+  }
+
+  @media (max-width: 560px) {
+    #topbar .logo svg { display: none; }
+    .top-actions .top-btn span { display: none; }
+    .divider { margin: 0 2px; }
+    #bottom-panel { bottom: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -399,6 +428,11 @@
     <button class="top-btn" id="btn-export">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Export PNG
+    </button>
+    <input type="file" id="wb-upload-input" accept="image/*" style="display:none">
+    <button class="top-btn" id="btn-upload">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload
     </button>
   </div>
 </div>
@@ -673,6 +707,35 @@ document.getElementById('btn-export').addEventListener('click', () => {
   a.href = tmp.toDataURL('image/png');
   a.download = 'whiteboard-' + Date.now() + '.png';
   a.click();
+});
+
+document.getElementById('btn-upload').addEventListener('click', () => {
+  document.getElementById('wb-upload-input')?.click();
+});
+
+document.getElementById('wb-upload-input').addEventListener('change', (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      saveHistory();
+      const margin = 24;
+      const targetW = Math.max(40, mainCanvas.width - margin * 2);
+      const targetH = Math.max(40, mainCanvas.height - margin * 2);
+      const scale = Math.min(targetW / img.width, targetH / img.height, 1);
+      const drawW = Math.max(1, Math.round(img.width * scale));
+      const drawH = Math.max(1, Math.round(img.height * scale));
+      const x = Math.round((mainCanvas.width - drawW) / 2);
+      const y = Math.round((mainCanvas.height - drawH) / 2);
+      ctx.drawImage(img, x, y, drawW, drawH);
+      notifyBoardChanged();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
 });
 
 // ZOOM

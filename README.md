@@ -327,10 +327,8 @@ For issues, feature requests, or contributions, please refer to the project repo
 - TURN servers are configured
 - Firewall rules allow WebRTC traffic
 
-
-###to do 
---permission- now
---file upload- later
---file sharing
-
-**IMPORTANT** added ice debuging from lines 182 to 208 in index.html will remove once backend is stable.
+## TODO
+- Add permission handling for camera/microphone on join.
+- Remove ICE debugging snippet from `public/index.html` (lines ~182-208) once backend is stable.
+- Add deployment example (HTTPS + reverse proxy).
+- Document TURN provider examples and credentials setup.
